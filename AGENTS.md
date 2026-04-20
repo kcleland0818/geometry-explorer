@@ -11,6 +11,7 @@ This template provides:
 - Consistent layout components (header, sidebar, main content area)
 - Help modal system
 - Local development server with WebSocket support
+- **Composer-ready bundle**: `npm run build:module` outputs `module/` for hosts that load `/simulations/{id}/content.html`, `simulation.css`, and `simulation.js`
 - Standardized file structure and naming conventions
 
 ## Quick Start
@@ -18,16 +19,22 @@ This template provides:
 1. **Customize the HTML template** (`client/index.html`):
    - Replace `<!-- APP_TITLE -->` with your page title
    - Replace `<!-- APP_NAME -->` with your app name
-   - Add your main content at `<!-- APP_SPECIFIC_MAIN_CONTENT -->`
+   - Replace the default `<main id="standalone-sim-mount" …>` block with your layout (keep that `id` and `data-bespoke-sim-root` if you use `standalone.js` and composer hosts)
+   - Keep `client/content.html` in sync with the same inner markup for `build:module`
    - Add app-specific CSS links at `<!-- APP_SPECIFIC_CSS -->`
    - Add app-specific JavaScript at `<!-- APP_SPECIFIC_SCRIPTS -->`
 
 2. **Create your application files**:
    - App-specific CSS (e.g., `my-app.css`)
-   - App-specific JavaScript (e.g., `my-app.js`)
+   - App-specific JavaScript (e.g., `my-app.js`); export `init(context)` from `simulation-app.js` for composer hosts
    - Help content (based on `help-content-template.html`)
 
-3. **Start the development server**:
+3. **Composer / multi-app host** (optional):
+   - Run `npm run build` for the full static app (`dist/`) and `npm run build:module` for the host bundle (`module/`)
+   - Serve the module tree with `IS_PRODUCTION=true SERVE_DIR=module PORT=<port> node server.js` (each app on its own port when the host proxies `/simulations/{id}/…`)
+   - Match `SIM_ID` in `client/standalone.js` to the `id` in the host’s `simulations.json`
+
+4. **Start the development server**:
    ```bash
    npm start
    ```
@@ -93,17 +100,17 @@ See [BESPOKE-TEMPLATE.md](./BESPOKE-TEMPLATE.md).
 
 ```
 client/
-  ├── index.html              # Main HTML template
-  ├── app.js                  # Application logic
-  ├── bespoke-template.css    # Template-specific styles
-  ├── help-modal.js           # Help modal system
-  ├── help-content-template.html  # Help content template
-  └── design-system/          # CodeSignal Design System
-      ├── colors/
-      ├── spacing/
-      ├── typography/
-      └── components/
-server.js                      # Development server
+  ├── index.html               # Main HTML template
+  ├── app.js                   # Shell: help modal + WebSocket
+  ├── standalone.js            # Standalone init(context) + /api/log
+  ├── simulation-app.js        # Composer entry: export init(context)
+  ├── content.html             # Fragment for composer host
+  ├── bespoke-simulation.css   # Styles for fragment → module/simulation.css
+  ├── bespoke-template.css     # Template layout
+  ├── help-content.html        # Help body HTML
+  └── design-system/           # CodeSignal Design System (git submodule)
+server.js                       # API + static (dist/ or module/ via SERVE_DIR)
+vite.config.module.js          # build:module → module/
 ```
 
 ## Notes for AI Agents

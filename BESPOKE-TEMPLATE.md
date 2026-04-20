@@ -3,7 +3,7 @@
 This document provides precise implementation instructions for creating
 embedded applications using the Bespoke Simulation template. Follow these
 instructions exactly to ensure consistency across all applications.
-NOTE: Never edit this `BESPOKE-TEMPLATE.md` file. Codebase changes should be reflected in the `AGENTS.md` file.
+Keep this document aligned with template behavior; `AGENTS.md` summarizes the same conventions for contributors.
 
 ## Required Files Structure
 
@@ -37,9 +37,10 @@ Every application should include these files in the following order:
       Replace with your application's display name (appears in header)
       Example: "Database Designer" or "Task Manager"
 
-   c) `<!-- APP_SPECIFIC_MAIN_CONTENT -->`
-      Add your application's main content area
-      Example: `<div id="canvas"></div>` or `<div id="editor"></div>`
+   c) Main content area
+      Replace the default `<main id="standalone-sim-mount" data-bespoke-sim-root>…</main>` block with your layout.
+      If you use a composer host, keep the same inner markup in `client/content.html` (fragment the host injects).
+      Preserve `id="standalone-sim-mount"` when using `standalone.js` unless you update `simulation-app.js` accordingly.
 
    d) `<!-- APP_SPECIFIC_CSS -->`
       Add links to your application-specific CSS files
@@ -49,7 +50,23 @@ Every application should include these files in the following order:
       Add links to your application-specific JavaScript files
       Example: `<script src="./my-app-logic.js"></script>`
 
-2. DO NOT modify the core structure (header, script loading order, etc.)
+2. DO NOT modify the core structure (header, script loading order, etc.) without reviewing `app.js`, `standalone.js`, and host loaders.
+
+## Composer hosts (multi-app workspace)
+
+Composer-style hosts load each app from the same origin under `/simulations/{id}/`:
+
+1. `content.html` — HTML fragment injected into a `.sim-slot[data-sim-id="{id}"]`
+2. `simulation.css` — styles for that fragment (from `bespoke-simulation.css` in this template)
+3. `simulation.js` — ES module exporting `init(context)` (and optionally `onAction`, `onMessage`)
+
+**Build:** `npm run build:module` writes these files under `module/`. The Rollup build marks `design-system/*` as external so the host page supplies those assets once.
+
+**Serve for the host:** `IS_PRODUCTION=true SERVE_DIR=module PORT=<port> node server.js` serves `module/` as static files. Use a distinct `PORT` per app when the host reverse-proxies to each repo.
+
+**Runtime contract:** `context` includes `config` (spread from the host registry, plus `basePath` like `/simulations/your-id`) and `emit(eventType, payload)` for telemetry. The template resolves DOM via `.sim-slot[data-sim-id]` + `[data-bespoke-sim-root]`; standalone mode uses `#standalone-sim-mount`.
+
+**Logging:** `POST /api/log` accepts `{ "entries": [...] }` and appends JSON lines to `logs/events.jsonl` (used by `standalone.js` and typical hosts).
 
 ## CSS Implementation
 

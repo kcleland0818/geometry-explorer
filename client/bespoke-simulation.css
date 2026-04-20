@@ -1,0 +1,12 @@
+/* Styles for simulation fragment (bundled as module/simulation.css) */
+.bespoke-sim-intro {
+  max-width: 36rem;
+}
+
+.bespoke-sim-hint code {
+  font-size: 0.9em;
+}
+
+.bespoke-sim-standalone-mount {
+  padding: var(--UI-Spacing-spacing-ml, 1rem);
+}

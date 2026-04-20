@@ -24,22 +24,32 @@
 
   <!-- Template-specific components (layout, utilities, temporary components) -->
   <link rel="stylesheet" href="./bespoke-template.css" />
+  <link rel="stylesheet" href="./bespoke-simulation.css" />
   <!-- APP_SPECIFIC_CSS -->
 </head>
 <body class="bespoke">
   <!-- Navigation Header -->
   <header class="header">
-    <h1 class="heading-small">APP NAME</h1>
+    <h1 class="heading-small"><!-- APP_NAME --></h1>
     <!-- APP_SPECIFIC_HEADER_CONTENT -->
     <div class="spacer"></div>
     <button id="btn-help" class="button button-text">Help</button>
   </header>
 
-  <!-- Main Application Content -->
-  <!-- APP_SPECIFIC_MAIN_CONTENT -->
+  <!-- Main Application Content: default starter below — replace when customizing; keep id & data-bespoke-sim-root if you use standalone.js + composer -->
+  <main id="standalone-sim-mount" class="bespoke-sim-standalone-mount" data-bespoke-sim-root>
+    <section class="box card bespoke-sim-intro">
+      <h2 class="heading-small">Your app</h2>
+      <p class="body-default bespoke-sim-hint">
+        Replace this block when customizing; keep in sync with <code>client/content.html</code> for composer builds.
+      </p>
+      <button type="button" class="button button-primary" id="btn-sim-demo">Send sample event</button>
+    </section>
+  </main>
 
   <!-- Core Scripts -->
   <script type="module" src="./app.js"></script>
+  <script type="module" src="./standalone.js"></script>
   <!-- APP_SPECIFIC_SCRIPTS -->
 </body>
 </html>
