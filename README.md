@@ -2,6 +2,8 @@
 
 This directory contains a template for creating embedded applications that share a consistent design system and user experience.
 
+Each app can run as a **normal static site** (`npm run build` → `dist/`) and as a **bundle for composer hosts** (`npm run build:module` → `module/`). Hosts fetch `/simulations/{id}/content.html`, `simulation.css`, and `simulation.js`; serve the module tree with `IS_PRODUCTION=true SERVE_DIR=module PORT=<port> node server.js`. See `AGENTS.md` and `BESPOKE-TEMPLATE.md`.
+
 ## Components
 
 ### 1. Design System Integration
@@ -24,12 +26,8 @@ A base HTML template that includes:
 - Help modal integration
 - Proper CSS and JavaScript loading
 
-### 4. `client/help-modal.js`
-A dependency-free JavaScript module for the help modal system:
-- Consistent modal behavior across all apps
-- Keyboard navigation (ESC to close)
-- Focus management
-- Custom event system
+### 4. `client/app.js` and `client/standalone.js`
+Shell behavior (help modal via design system `Modal`, WebSocket) plus standalone `init(context)` wiring for the same contract composer hosts use.
 
 ### 5. `client/help-content-template.html`
 A template for creating consistent help content:
@@ -52,7 +50,7 @@ A template for creating consistent help content:
    - `<!-- APP_TITLE -->` - Your application title
    - `<!-- APP_NAME -->` - Your application name (appears in header)
    - `<!-- APP_SPECIFIC_HEADER_CONTENT -->` - Any additional header elements
-   - `<!-- APP_SPECIFIC_MAIN_CONTENT -->` - Your main content area
+   - Default `<main id="standalone-sim-mount" …>` / `client/content.html` — your main UI (keep in sync for composer)
    - `<!-- APP_SPECIFIC_CSS -->` - Links to your app-specific CSS files
    - `<!-- APP_SPECIFIC_SCRIPTS -->` - Links to your app-specific JavaScript files
 

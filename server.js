@@ -16,19 +16,21 @@ try {
 }
 
 const DIST_DIR = path.join(__dirname, 'dist');
-// Check if IS_PRODUCTION is set to true
+const STATIC_DIR = process.env.SERVE_DIR
+  ? path.join(__dirname, process.env.SERVE_DIR)
+  : DIST_DIR;
 const isProduction = process.env.IS_PRODUCTION === 'true';
-// In production mode, dist directory must exist
-if (isProduction && !fs.existsSync(DIST_DIR)) {
-  throw new Error(`Production mode enabled but dist directory does not exist: ${DIST_DIR}`);
+if (isProduction && !fs.existsSync(STATIC_DIR)) {
+  throw new Error(`Production mode enabled but serve directory does not exist: ${STATIC_DIR}`);
 }
-// Force port 3000 in production, otherwise use PORT environment variable or default to 3000
-const PORT = isProduction ? 3000 : (process.env.PORT || 3000);
+const PORT = process.env.PORT || 3000;
 
-// Track connected WebSocket clients
 const wsClients = new Set();
 
-// MIME types for different file extensions
+const LOG_DIR = path.join(__dirname, 'logs');
+const LOG_FILE = path.join(LOG_DIR, 'events.jsonl');
+if (!fs.existsSync(LOG_DIR)) fs.mkdirSync(LOG_DIR, { recursive: true });
+
 const mimeTypes = {
   '.html': 'text/html',
   '.js': 'text/javascript',
@@ -46,13 +48,11 @@ const mimeTypes = {
   '.eot': 'application/vnd.ms-fontobject'
 };
 
-// Get MIME type based on file extension
 function getMimeType(filePath) {
   const ext = path.extname(filePath).toLowerCase();
   return mimeTypes[ext] || 'text/plain';
 }
 
-// Serve static files
 function serveFile(filePath, res) {
   fs.readFile(filePath, (err, data) => {
     if (err) {
@@ -67,8 +67,45 @@ function serveFile(filePath, res) {
   });
 }
 
-// Handle POST requests
+function readBody(req) {
+  return new Promise((resolve, reject) => {
+    let body = '';
+    req.on('data', chunk => { body += chunk.toString(); });
+    req.on('end', () => {
+      try { resolve(JSON.parse(body)); }
+      catch (e) { reject(e); }
+    });
+    req.on('error', reject);
+  });
+}
+
+async function handleLogRequest(req, res) {
+  try {
+    const data = await readBody(req);
+    const entries = data.entries;
+    if (!Array.isArray(entries) || entries.length === 0) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'entries array is required' }));
+      return;
+    }
+    const lines = entries.map(e => JSON.stringify(e)).join('\n') + '\n';
+    fs.appendFile(LOG_FILE, lines, (err) => {
+      if (err) console.error('Failed to write log:', err);
+    });
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ ok: true, count: entries.length }));
+  } catch (error) {
+    res.writeHead(400, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Invalid JSON' }));
+  }
+}
+
 function handlePostRequest(req, res, parsedUrl) {
+  if (parsedUrl.pathname === '/api/log') {
+    handleLogRequest(req, res);
+    return;
+  }
+
   if (parsedUrl.pathname === '/message') {
     let body = '';
 
@@ -87,7 +124,6 @@ function handlePostRequest(req, res, parsedUrl) {
           return;
         }
 
-        // Check if WebSocket is available
         if (!isWebSocketAvailable) {
           res.writeHead(503, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({
@@ -97,7 +133,6 @@ function handlePostRequest(req, res, parsedUrl) {
           return;
         }
 
-        // Broadcast message to all connected WebSocket clients
         wsClients.forEach(client => {
           if (client.readyState === WebSocket.OPEN) {
             client.send(JSON.stringify({ type: 'message', message: message }));
@@ -118,28 +153,22 @@ function handlePostRequest(req, res, parsedUrl) {
   }
 }
 
-// Create HTTP server
 const server = http.createServer((req, res) => {
   const parsedUrl = url.parse(req.url, true);
   let pathName = parsedUrl.pathname === '/' ? '/index.html' : parsedUrl.pathname;
 
-  // Handle POST requests
   if (req.method === 'POST') {
     handlePostRequest(req, res, parsedUrl);
     return;
   }
 
-  // In production mode, serve static files from dist directory
   if (isProduction) {
-    // Strip leading slashes so path.join/resolve can't ignore DIST_DIR
-    let filePath = path.join(DIST_DIR, pathName.replace(/^\/+/, ''));
+    let filePath = path.join(STATIC_DIR, pathName.replace(/^\/+/, ''));
 
-    // Security check - prevent directory traversal
-    const resolvedDistDir = path.resolve(DIST_DIR);
+    const resolvedBaseDir = path.resolve(STATIC_DIR);
     const resolvedFilePath = path.resolve(filePath);
-    const relativePath = path.relative(resolvedDistDir, resolvedFilePath);
+    const relativePath = path.relative(resolvedBaseDir, resolvedFilePath);
 
-    // Reject if path tries to traverse outside the base directory
     if (relativePath.startsWith('..')) {
       res.writeHead(403, { 'Content-Type': 'text/plain' });
       res.end('Forbidden');
@@ -148,16 +177,11 @@ const server = http.createServer((req, res) => {
 
     serveFile(filePath, res);
   } else {
-    // Development mode - static files are served by Vite
     res.writeHead(404, { 'Content-Type': 'text/plain' });
     res.end('Not found (development mode - use Vite dev server `npm run start:dev`)');
   }
 });
 
-// Create WebSocket server only if WebSocket is available
-// Note: WebSocket upgrade handling is performed automatically by the ws library
-// when attached to the HTTP server. The HTTP request handler should NOT send
-// a response for upgrade requests - the ws library handles the upgrade internally.
 if (isWebSocketAvailable) {
   const wss = new WebSocket.Server({
     server,
@@ -180,11 +204,10 @@ if (isWebSocketAvailable) {
   });
 }
 
-// Start server
 server.listen(PORT, () => {
   console.log(`Server running at http://localhost:${PORT}`);
   if (isProduction) {
-    console.log(`Serving static files from: ${DIST_DIR}`);
+    console.log(`Serving static files from: ${STATIC_DIR}`);
   } else {
     console.log(`Development mode - static files served by Vite`);
   }
@@ -196,7 +219,6 @@ server.listen(PORT, () => {
   console.log('Press Ctrl+C to stop the server');
 });
 
-// Handle server errors
 server.on('error', (err) => {
   if (err.code === 'EADDRINUSE') {
     console.error(`Port ${PORT} is already in use. Please try a different port.`);
@@ -206,7 +228,6 @@ server.on('error', (err) => {
   process.exit(1);
 });
 
-// Graceful shutdown
 process.on('SIGINT', () => {
   console.log('\nShutting down server...');
   server.close(() => {
