@@ -1,0 +1,301 @@
+/* Geometry Explorer — sidebar stack + canvas fills main area */
+
+.bespoke {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.bespoke > main.main-layout.geometry-main {
+  flex: 1;
+  min-height: 0;
+}
+
+/* More room for the figure: narrower sidebar, main column grows */
+.bespoke .main-layout.geometry-main {
+  grid-template-columns: minmax(300px, 380px) minmax(0, 1fr);
+  flex: 1;
+  min-height: calc(100vh - 42px);
+  height: auto;
+}
+
+.bespoke .geometry-main > .geometry-sidebar,
+.bespoke .geometry-main > .geometry-content {
+  min-height: 0;
+}
+
+.bespoke .geometry-sidebar {
+  padding: var(--UI-Spacing-spacing-ml) var(--UI-Spacing-spacing-s);
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+}
+
+/* Single card: Shape → Measurements → Dimensions */
+.bespoke .geometry-sidebar-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin: 0;
+  padding: var(--UI-Spacing-spacing-ml) var(--UI-Spacing-spacing-ml);
+}
+
+.bespoke .geometry-panel-section {
+  padding: var(--UI-Spacing-spacing-ml) 0;
+}
+
+.bespoke .geometry-panel-section + .geometry-panel-section {
+  border-top: 1px solid var(--Colors-Stroke-Default);
+  margin-top: var(--UI-Spacing-spacing-s);
+  padding-top: var(--UI-Spacing-spacing-ml);
+}
+
+.bespoke .geometry-panel-section--sliders {
+  padding-bottom: 0;
+}
+
+.bespoke .geometry-card-title {
+  margin: 0 0 var(--UI-Spacing-spacing-s) 0;
+  padding-bottom: var(--UI-Spacing-spacing-xs);
+  border-bottom: none;
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--Colors-Text-Body-Strongest);
+}
+
+.bespoke .geometry-panel-lede {
+  margin: 0 0 var(--UI-Spacing-spacing-ml) 0;
+  line-height: 1.5;
+  color: var(--Colors-Text-Body-Subtle);
+  font-size: 0.8125rem;
+}
+
+.bespoke label.geometry-field-label {
+  display: block;
+  margin: 0 0 var(--UI-Spacing-spacing-xxs) 0;
+  font-size: 0.875rem;
+  line-height: 1.45;
+  color: var(--Colors-Text-Body-Stronger);
+  font-weight: 600;
+}
+
+.bespoke .geometry-field {
+  margin-bottom: var(--UI-Spacing-spacing-ml);
+}
+
+.bespoke .geometry-field--compact {
+  margin-bottom: var(--UI-Spacing-spacing-s);
+}
+
+.bespoke .geometry-field--compact:last-of-type {
+  margin-bottom: 0;
+}
+
+.bespoke .geometry-control-label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--Colors-Text-Body-Stronger);
+  margin-bottom: var(--UI-Spacing-spacing-xxs);
+  line-height: 1.4;
+}
+
+.bespoke .geometry-select {
+  width: 100%;
+  padding: var(--UI-Spacing-spacing-s) var(--UI-Spacing-spacing-ml);
+  border-radius: var(--UI-Radius-radius-s);
+  border: 1px solid var(--Colors-Stroke-Default);
+  background: var(--Colors-Backgrounds-Main-Default);
+  color: var(--Colors-Text-Body-Default);
+  font-size: 0.875rem;
+  line-height: 1.45;
+}
+
+.bespoke .geometry-metrics {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--UI-Spacing-spacing-s);
+}
+
+.bespoke .geometry-metric-row {
+  padding: var(--UI-Spacing-spacing-s) var(--UI-Spacing-spacing-ml);
+  border-radius: var(--UI-Radius-radius-s);
+  background: var(--Colors-Backgrounds-Main-Top);
+  border: 1px solid var(--Colors-Stroke-Default);
+}
+
+.bespoke .geometry-metric-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--UI-Spacing-spacing-ml);
+  margin-bottom: var(--UI-Spacing-spacing-xxs);
+}
+
+.bespoke .geometry-metric-name {
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--Colors-Text-Body-Strongest);
+}
+
+.bespoke .geometry-metric-value {
+  font-size: 0.9375rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--Colors-Primary-Default);
+  font-weight: 700;
+  text-align: right;
+  flex-shrink: 0;
+  line-height: 1.35;
+}
+
+.bespoke .geometry-metric-hint {
+  margin: 0;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: var(--Colors-Text-Body-Subtle);
+}
+
+/* Units note sits directly under the metric rows */
+.bespoke .geometry-units-note {
+  margin-top: var(--UI-Spacing-spacing-s);
+  margin-bottom: 0;
+  padding-top: var(--UI-Spacing-spacing-xs);
+  border-top: 1px dashed var(--Colors-Stroke-Default);
+  font-size: 0.75rem;
+  line-height: 1.55;
+  color: var(--Colors-Text-Body-Subtle);
+}
+
+.bespoke .geometry-slider-block {
+  margin-bottom: var(--UI-Spacing-spacing-xl);
+}
+
+.bespoke .geometry-slider-block:last-child {
+  margin-bottom: 0;
+}
+
+/* Dimensions: compact number + long horizontal track */
+.bespoke .geometry-panel-section--sliders .numeric-slider-container.with-inputs {
+  flex-direction: row;
+  align-items: center;
+  gap: var(--UI-Spacing-spacing-ml);
+}
+
+.bespoke .geometry-panel-section--sliders .numeric-slider-container.with-inputs .numeric-slider-input {
+  order: 0;
+  width: 4.25rem;
+  max-width: none;
+  min-width: 3.5rem;
+  min-height: 2.5rem;
+  flex-shrink: 0;
+  padding: var(--UI-Spacing-spacing-xs) var(--UI-Spacing-spacing-s);
+  font-size: 1rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  border-radius: var(--UI-Radius-radius-s);
+}
+
+.bespoke .geometry-panel-section--sliders .numeric-slider-container.with-inputs .numeric-slider-wrapper {
+  flex: 1;
+  min-width: 0;
+  height: 22px;
+}
+
+.bespoke .geometry-panel-section--sliders .numeric-slider-track {
+  height: 10px;
+  border-radius: 6px;
+}
+
+.bespoke .geometry-panel-section--sliders .numeric-slider-filled {
+  height: 10px;
+  border-radius: 6px;
+}
+
+.bespoke .geometry-panel-section--sliders .numeric-slider-handle {
+  width: 22px;
+  height: 22px;
+  top: -6px;
+}
+
+/* Main canvas column fills viewport height */
+.bespoke .geometry-content {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  background: var(--Colors-Backgrounds-Main-Top);
+}
+
+.bespoke .geometry-stage {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: var(--UI-Spacing-spacing-xs);
+  align-items: stretch;
+  justify-content: stretch;
+}
+
+.bespoke .geometry-canvas-frame {
+  flex: 1;
+  min-height: min(72vh, 900px);
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+}
+
+.bespoke #geometry-canvas {
+  display: block;
+  border-radius: var(--UI-Radius-radius-m);
+  background: var(--Colors-Backgrounds-Main-Default);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.bespoke .modal-overlay .modal-content {
+  align-items: stretch;
+}
+
+.bespoke .modal-overlay .modal-content .toc {
+  margin-bottom: var(--UI-Spacing-spacing-xl);
+}
+
+.bespoke .modal-overlay .modal-content section {
+  margin-bottom: var(--UI-Spacing-spacing-xl);
+}
+
+.bespoke .modal-overlay .modal-content section h2 {
+  margin-bottom: var(--UI-Spacing-spacing-ml);
+}
+
+.bespoke .modal-overlay .modal-content section p,
+.bespoke .modal-overlay .modal-content section li {
+  line-height: 1.65;
+}
+
+.bespoke .modal-overlay .modal-content section p + p {
+  margin-top: var(--UI-Spacing-spacing-ms);
+}
+
+@media (max-width: 768px) {
+  .bespoke .main-layout.geometry-main {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto minmax(280px, 55vh);
+  }
+
+  .bespoke .geometry-sidebar {
+    border-right: none;
+    border-bottom: 1px solid var(--Colors-Stroke-Default);
+    max-height: none;
+  }
+
+  .bespoke .geometry-canvas-frame {
+    min-height: 240px;
+  }
+}
