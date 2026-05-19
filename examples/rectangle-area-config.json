@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "initialState": {
+    "mode": "2d",
+    "shape": "rectangle",
+    "values": {
+      "width": 10,
+      "height": 4
+    }
+  },
+  "ui": {
+    "lockedMode": false,
+    "lockedShape": false,
+    "showFormulaHints": true
+  },
+  "evaluation": {
+    "target": {
+      "metric": "area",
+      "value": 40
+    }
+  }
+}

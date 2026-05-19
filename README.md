@@ -172,6 +172,34 @@ curl -X POST http://localhost:3000/message \
   -d '{"message": "Hello from the server!"}'
 ```
 
+### Runtime Config and Snapshot API
+
+CodeSignal task setup can replace the root `config.json` before starting the server. The app reads this through `GET /config` on load and initializes the selected shape and dimensions from `initialState`.
+
+Example `config.json`:
+
+```json
+{
+  "version": 1,
+  "initialState": {
+    "mode": "3d",
+    "shape": "cylinder",
+    "values": {
+      "radius": 3,
+      "height": 8
+    }
+  },
+  "ui": {
+    "lockedMode": false,
+    "lockedShape": false,
+    "showFormulaHints": true
+  },
+  "evaluation": {}
+}
+```
+
+The browser posts the latest simulation state to `POST /snapshot` whenever the learner changes dimensions, mode, or shape. Evaluators can call `GET /snapshot` to read the latest state, including computed metrics.
+
 ## CI/CD and Automated Releases
 
 This template includes a GitHub Actions workflow (`.github/workflows/build-release.yml`) that automatically builds and releases your application when you push to the `main` branch.

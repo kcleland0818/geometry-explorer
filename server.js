@@ -19,6 +19,7 @@ const DIST_DIR = path.join(__dirname, 'dist');
 const STATIC_DIR = process.env.SERVE_DIR
   ? path.join(__dirname, process.env.SERVE_DIR)
   : DIST_DIR;
+const CONFIG_FILE = path.join(__dirname, 'config.json');
 const isProduction = process.env.IS_PRODUCTION === 'true';
 if (isProduction && !fs.existsSync(STATIC_DIR)) {
   throw new Error(`Production mode enabled but serve directory does not exist: ${STATIC_DIR}`);
@@ -30,6 +31,26 @@ const wsClients = new Set();
 const LOG_DIR = path.join(__dirname, 'logs');
 const LOG_FILE = path.join(LOG_DIR, 'events.jsonl');
 if (!fs.existsSync(LOG_DIR)) fs.mkdirSync(LOG_DIR, { recursive: true });
+
+const DEFAULT_CONFIG = {
+  version: 1,
+  initialState: {
+    mode: '2d',
+    shape: 'rectangle',
+    values: {
+      width: 8,
+      height: 5
+    }
+  },
+  ui: {
+    lockedMode: false,
+    lockedShape: false,
+    showFormulaHints: true
+  },
+  evaluation: {}
+};
+
+let currentSnapshot = null;
 
 const mimeTypes = {
   '.html': 'text/html',
@@ -67,6 +88,62 @@ function serveFile(filePath, res) {
   });
 }
 
+function sendJson(res, statusCode, payload) {
+  res.writeHead(statusCode, {
+    'Content-Type': 'application/json',
+    'Cache-Control': 'no-store'
+  });
+  res.end(JSON.stringify(payload));
+}
+
+function loadConfig() {
+  if (!fs.existsSync(CONFIG_FILE)) {
+    return DEFAULT_CONFIG;
+  }
+
+  try {
+    const raw = fs.readFileSync(CONFIG_FILE, 'utf8');
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      console.warn('config.json must contain a JSON object; using default config');
+      return DEFAULT_CONFIG;
+    }
+    return {
+      ...DEFAULT_CONFIG,
+      ...parsed,
+      initialState: {
+        ...DEFAULT_CONFIG.initialState,
+        ...(parsed.initialState && typeof parsed.initialState === 'object' ? parsed.initialState : {})
+      },
+      ui: {
+        ...DEFAULT_CONFIG.ui,
+        ...(parsed.ui && typeof parsed.ui === 'object' ? parsed.ui : {})
+      },
+      evaluation: {
+        ...DEFAULT_CONFIG.evaluation,
+        ...(parsed.evaluation && typeof parsed.evaluation === 'object' ? parsed.evaluation : {})
+      }
+    };
+  } catch (error) {
+    console.error('Failed to read config.json; using default config:', error.message);
+    return DEFAULT_CONFIG;
+  }
+}
+
+function snapshotFromConfig() {
+  const config = loadConfig();
+  const initialState = config.initialState || {};
+  return {
+    version: 1,
+    source: 'config',
+    mode: initialState.mode || DEFAULT_CONFIG.initialState.mode,
+    shape: initialState.shape || initialState.shape2d || initialState.shape3d || DEFAULT_CONFIG.initialState.shape,
+    values: initialState.values || DEFAULT_CONFIG.initialState.values,
+    metrics: null,
+    updatedAt: null
+  };
+}
+
 function readBody(req) {
   return new Promise((resolve, reject) => {
     let body = '';
@@ -100,9 +177,48 @@ async function handleLogRequest(req, res) {
   }
 }
 
+async function handleSnapshotRequest(req, res) {
+  try {
+    const data = await readBody(req);
+    if (!data || typeof data !== 'object' || Array.isArray(data)) {
+      sendJson(res, 400, { error: 'snapshot object is required' });
+      return;
+    }
+
+    currentSnapshot = {
+      ...data,
+      source: 'client',
+      updatedAt: new Date().toISOString()
+    };
+
+    sendJson(res, 200, { ok: true, snapshot: currentSnapshot });
+  } catch (error) {
+    sendJson(res, 400, { error: 'Invalid JSON' });
+  }
+}
+
+function handleGetRequest(req, res, parsedUrl) {
+  if (parsedUrl.pathname === '/config') {
+    sendJson(res, 200, loadConfig());
+    return true;
+  }
+
+  if (parsedUrl.pathname === '/snapshot') {
+    sendJson(res, 200, currentSnapshot || snapshotFromConfig());
+    return true;
+  }
+
+  return false;
+}
+
 function handlePostRequest(req, res, parsedUrl) {
   if (parsedUrl.pathname === '/api/log') {
     handleLogRequest(req, res);
+    return;
+  }
+
+  if (parsedUrl.pathname === '/snapshot') {
+    handleSnapshotRequest(req, res);
     return;
   }
 
@@ -156,6 +272,10 @@ function handlePostRequest(req, res, parsedUrl) {
 const server = http.createServer((req, res) => {
   const parsedUrl = url.parse(req.url, true);
   let pathName = parsedUrl.pathname === '/' ? '/index.html' : parsedUrl.pathname;
+
+  if (req.method === 'GET' && handleGetRequest(req, res, parsedUrl)) {
+    return;
+  }
 
   if (req.method === 'POST') {
     handlePostRequest(req, res, parsedUrl);
