@@ -6,6 +6,10 @@ import NumericSlider from './design-system/components/numeric-slider/numeric-sli
 const U = 'u';
 const U2 = 'u²';
 const U3 = 'u³';
+const DEFAULT_MODE = '2d';
+const DEFAULT_SHAPE_2D = 'rectangle';
+const DEFAULT_SHAPE_3D = 'prism';
+const SNAPSHOT_DEBOUNCE_MS = 250;
 
 function formatNumber(n) {
   if (!Number.isFinite(n)) return '—';
@@ -175,6 +179,88 @@ const SHAPES_3D = {
     },
   },
 };
+
+function getCatalog(mode) {
+  return mode === '3d' ? SHAPES_3D : SHAPES_2D;
+}
+
+function getCurrentShapeKey(state) {
+  return state.mode === '3d' ? state.shape3d : state.shape2d;
+}
+
+function getShapeDefForState(state) {
+  return getCatalog(state.mode)[getCurrentShapeKey(state)];
+}
+
+function snapToStep(value, min, step) {
+  if (!Number.isFinite(step) || step <= 0) return value;
+  const snapped = Math.round((value - min) / step) * step + min;
+  return Number(snapped.toFixed(6));
+}
+
+function normalizeValues(def, inputValues = {}) {
+  const values = inputValues && typeof inputValues === 'object' ? inputValues : {};
+  const out = {};
+  def.keys.forEach((key) => {
+    const raw = values[key];
+    const numeric = Number(raw);
+    const fallback = def.defaults[key];
+    const value = Number.isFinite(numeric) ? numeric : fallback;
+    const clamped = Math.min(def.ranges.max, Math.max(def.ranges.min, value));
+    out[key] = snapToStep(clamped, def.ranges.min, def.ranges.step);
+  });
+  return out;
+}
+
+function normalizeInitialState(config) {
+  const initial = config?.initialState || config?.state || {};
+  const requestedMode = initial.mode === '3d' ? '3d' : DEFAULT_MODE;
+  const catalog = getCatalog(requestedMode);
+  const fallbackShape = requestedMode === '3d' ? DEFAULT_SHAPE_3D : DEFAULT_SHAPE_2D;
+  const requestedShape =
+    typeof initial.shape === 'string'
+      ? initial.shape
+      : requestedMode === '3d'
+        ? initial.shape3d
+        : initial.shape2d;
+  const shape = Object.prototype.hasOwnProperty.call(catalog, requestedShape)
+    ? requestedShape
+    : fallbackShape;
+  const def = catalog[shape];
+  const values = normalizeValues(def, initial.values);
+
+  return {
+    mode: requestedMode,
+    shape2d: requestedMode === '2d' ? shape : DEFAULT_SHAPE_2D,
+    shape3d: requestedMode === '3d' ? shape : DEFAULT_SHAPE_3D,
+    values,
+  };
+}
+
+async function loadRuntimeConfig() {
+  try {
+    const response = await fetch('/config', { cache: 'no-store' });
+    if (!response.ok) {
+      console.warn('Geometry Explorer config request failed:', response.status);
+      return {};
+    }
+    const config = await response.json();
+    return config && typeof config === 'object' ? config : {};
+  } catch (error) {
+    console.warn('Geometry Explorer config could not be loaded; using defaults.', error);
+    return {};
+  }
+}
+
+function buildSnapshot(state, metrics) {
+  return {
+    version: 1,
+    mode: state.mode,
+    shape: getCurrentShapeKey(state),
+    values: { ...state.values },
+    metrics: { ...metrics },
+  };
+}
 
 function draw2D(ctx, canvas, shapeKey, values) {
   const { w, h } = getLogicalCanvasSize(canvas);
@@ -529,7 +615,7 @@ function draw3D(ctx, canvas, shapeKey, values) {
   }
 }
 
-function initGeometryExplorer() {
+async function initGeometryExplorer() {
   const canvas = document.getElementById('geometry-canvas');
   const modeSelect = document.getElementById('geometry-mode');
   const shapeSelect = document.getElementById('geometry-shape');
@@ -538,19 +624,14 @@ function initGeometryExplorer() {
   const formulaEl = document.getElementById('geometry-formula-note');
   if (!canvas || !modeSelect || !shapeSelect || !slidersRoot || !metricsList) return;
 
+  const runtimeConfig = await loadRuntimeConfig();
   const ctx = canvas.getContext('2d');
   let sliders = [];
-  let state = {
-    mode: '2d',
-    shape2d: 'rectangle',
-    shape3d: 'prism',
-    values: { ...SHAPES_2D.rectangle.defaults },
-  };
+  let snapshotTimer = null;
+  let state = normalizeInitialState(runtimeConfig);
 
   function getShapeDef() {
-    return state.mode === '2d'
-      ? SHAPES_2D[state.shape2d]
-      : SHAPES_3D[state.shape3d];
+    return getShapeDefForState(state);
   }
 
   function readValuesFromSliders() {
@@ -562,7 +643,46 @@ function initGeometryExplorer() {
     return out;
   }
 
-  function syncMetrics() {
+  async function postSnapshot(snapshot) {
+    try {
+      await fetch('/snapshot', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(snapshot),
+      });
+    } catch (error) {
+      console.warn('Geometry Explorer snapshot could not be saved.', error);
+    }
+  }
+
+  function publishSnapshot(metrics, immediate = false) {
+    const snapshot = buildSnapshot(state, metrics);
+    if (snapshotTimer) {
+      clearTimeout(snapshotTimer);
+      snapshotTimer = null;
+    }
+
+    if (immediate) {
+      postSnapshot(snapshot);
+      return;
+    }
+
+    snapshotTimer = setTimeout(() => {
+      snapshotTimer = null;
+      postSnapshot(snapshot);
+    }, SNAPSHOT_DEBOUNCE_MS);
+  }
+
+  function applyUiConfig() {
+    const ui = runtimeConfig.ui || {};
+    modeSelect.disabled = ui.lockedMode === true;
+    shapeSelect.disabled = ui.lockedShape === true;
+    if (formulaEl) {
+      formulaEl.hidden = ui.showFormulaHints === false;
+    }
+  }
+
+  function syncMetrics({ publish = true, immediate = false } = {}) {
     const def = getShapeDef();
     state.values = readValuesFromSliders();
     const computed = def.compute(state.values);
@@ -614,6 +734,10 @@ function initGeometryExplorer() {
     } else {
       draw3D(ctx, canvas, state.shape3d, state.values);
     }
+
+    if (publish) {
+      publishSnapshot(computed, immediate);
+    }
   }
 
   function rebuildSliders() {
@@ -657,8 +781,8 @@ function initGeometryExplorer() {
   }
 
   function populateShapeOptions() {
-    const catalog = state.mode === '2d' ? SHAPES_2D : SHAPES_3D;
-    let currentKey = state.mode === '2d' ? state.shape2d : state.shape3d;
+    const catalog = getCatalog(state.mode);
+    let currentKey = getCurrentShapeKey(state);
     const keys = Object.keys(catalog);
     if (!keys.includes(currentKey)) {
       currentKey = keys[0];
@@ -701,16 +825,17 @@ function initGeometryExplorer() {
 
   const frameEl = canvas.parentElement;
   const ro = new ResizeObserver(() => {
-    syncMetrics();
+    syncMetrics({ publish: false });
   });
   if (frameEl) {
     ro.observe(frameEl);
   }
 
-  populateShapeOptions();
+  applyUiConfig();
   modeSelect.value = state.mode;
+  populateShapeOptions();
   rebuildSliders();
-  syncMetrics();
+  syncMetrics({ immediate: true });
 }
 
 export { initGeometryExplorer };

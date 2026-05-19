@@ -40,6 +40,13 @@ This template provides:
    ```
    Server runs on `http://localhost:3000`
 
+## CodeSignal Runtime Contract
+
+- Root `config.json` is loaded through `GET /config`; task setup scripts may replace it before server startup.
+- The Geometry Explorer client reads `initialState.mode`, `initialState.shape`, and `initialState.values` to initialize the app.
+- The client posts current state to `POST /snapshot`; evaluators can read it with `GET /snapshot`.
+- Release tarballs must include `dist/`, `package.json`, `config.json`, `server.js`, and production `node_modules/`.
+
 ## Key Conventions
 
 ### File Naming

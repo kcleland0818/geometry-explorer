@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "initialState": {
+    "mode": "3d",
+    "shape": "cylinder",
+    "values": {
+      "radius": 3,
+      "height": 8
+    }
+  },
+  "ui": {
+    "lockedMode": true,
+    "lockedShape": true,
+    "showFormulaHints": true
+  },
+  "evaluation": {
+    "target": {
+      "metric": "volume",
+      "value": 226.195
+    },
+    "tolerance": 0.01
+  }
+}

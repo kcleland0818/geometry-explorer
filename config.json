@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "initialState": {
+    "mode": "2d",
+    "shape": "circle",
+    "values": {
+      "radius": 6
+    }
+  },
+  "ui": {
+    "lockedMode": false,
+    "lockedShape": true,
+    "showFormulaHints": false
+  },
+  "evaluation": {
+    "target": {
+      "metric": "perimeter",
+      "value": 37.699
+    },
+    "tolerance": 0.01
+  }
+}
