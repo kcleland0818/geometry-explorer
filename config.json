@@ -7,8 +7,11 @@
       "radius": 6
     }
   },
+  "sliders": {
+    "radius": { "min": 1, "max": 12, "step": 1 }
+  },
   "ui": {
-    "lockedMode": false,
+    "lockedMode": true,
     "lockedShape": true,
     "showFormulaHints": false
   },

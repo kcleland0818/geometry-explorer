@@ -198,16 +198,52 @@ function snapToStep(value, min, step) {
   return Number(snapped.toFixed(6));
 }
 
-function normalizeValues(def, inputValues = {}) {
+function normalizeSliderRangeFragment(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const out = {};
+  const min = Number(raw.min);
+  const max = Number(raw.max);
+  const step = Number(raw.step);
+  if (Number.isFinite(min)) out.min = min;
+  if (Number.isFinite(max)) out.max = max;
+  if (Number.isFinite(step) && step > 0) out.step = step;
+  return Object.keys(out).length ? out : null;
+}
+
+function resolveSliderRanges(def, sliderConfig) {
+  const base = def.ranges;
+  const global = normalizeSliderRangeFragment(sliderConfig);
+  const out = {};
+  def.keys.forEach((key) => {
+    const keyFrag = normalizeSliderRangeFragment(
+      sliderConfig && typeof sliderConfig === 'object' ? sliderConfig[key] : null,
+    );
+    let min = keyFrag?.min ?? global?.min ?? base.min;
+    let max = keyFrag?.max ?? global?.max ?? base.max;
+    let step = keyFrag?.step ?? global?.step ?? base.step;
+    if (!Number.isFinite(min)) min = base.min;
+    if (!Number.isFinite(max)) max = base.max;
+    if (!Number.isFinite(step) || step <= 0) step = base.step;
+    if (min >= max) {
+      min = base.min;
+      max = base.max;
+    }
+    out[key] = { min, max, step };
+  });
+  return out;
+}
+
+function normalizeValues(def, inputValues = {}, rangesByKey) {
   const values = inputValues && typeof inputValues === 'object' ? inputValues : {};
   const out = {};
   def.keys.forEach((key) => {
+    const ranges = rangesByKey?.[key] || def.ranges;
     const raw = values[key];
     const numeric = Number(raw);
     const fallback = def.defaults[key];
     const value = Number.isFinite(numeric) ? numeric : fallback;
-    const clamped = Math.min(def.ranges.max, Math.max(def.ranges.min, value));
-    out[key] = snapToStep(clamped, def.ranges.min, def.ranges.step);
+    const clamped = Math.min(ranges.max, Math.max(ranges.min, value));
+    out[key] = snapToStep(clamped, ranges.min, ranges.step);
   });
   return out;
 }
@@ -227,7 +263,8 @@ function normalizeInitialState(config) {
     ? requestedShape
     : fallbackShape;
   const def = catalog[shape];
-  const values = normalizeValues(def, initial.values);
+  const rangesByKey = resolveSliderRanges(def, config?.sliders);
+  const values = normalizeValues(def, initial.values, rangesByKey);
 
   return {
     mode: requestedMode,
@@ -262,7 +299,7 @@ function buildSnapshot(state, metrics) {
   };
 }
 
-function draw2D(ctx, canvas, shapeKey, values) {
+function draw2D(ctx, canvas, shapeKey, values, rangesByKey = {}) {
   const { w, h } = getLogicalCanvasSize(canvas);
   ctx.clearRect(0, 0, w, h);
   ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--Colors-Backgrounds-Main-Default') || '#fff';
@@ -323,7 +360,7 @@ function draw2D(ctx, canvas, shapeKey, values) {
     ctx.fillText(`h = ${rh}`, x0 + bw + 8, y0 + bh / 2);
   } else if (shapeKey === 'circle') {
     const r = values.radius;
-    const rMax = SHAPES_2D.circle.ranges.max;
+    const rMax = rangesByKey.radius?.max ?? SHAPES_2D.circle.ranges.max;
     const maxPixelR = Math.min(innerW, innerH) / 2 * 0.88;
     const rad = (r / rMax) * maxPixelR;
     ctx.beginPath();
@@ -395,7 +432,7 @@ function draw2D(ctx, canvas, shapeKey, values) {
   }
 }
 
-function draw3D(ctx, canvas, shapeKey, values) {
+function draw3D(ctx, canvas, shapeKey, values, rangesByKey = {}) {
   const { w, h } = getLogicalCanvasSize(canvas);
   ctx.clearRect(0, 0, w, h);
   const bg = getComputedStyle(document.documentElement).getPropertyValue('--Colors-Backgrounds-Main-Default') || '#fff';
@@ -570,7 +607,7 @@ function draw3D(ctx, canvas, shapeKey, values) {
     ctx.fillText(`h=${ht}`, cx - rw / 2 - 28, cy);
   } else if (shapeKey === 'sphere') {
     const r = values.radius;
-    const rMax = SHAPES_3D.sphere.ranges.max;
+    const rMax = rangesByKey.radius?.max ?? SHAPES_3D.sphere.ranges.max;
     const maxRad = Math.min(w, h) * 0.38;
     const rad = (r / rMax) * maxRad;
 
@@ -682,8 +719,13 @@ async function initGeometryExplorer() {
     }
   }
 
+  function getSliderRanges() {
+    return resolveSliderRanges(getShapeDef(), runtimeConfig.sliders);
+  }
+
   function syncMetrics({ publish = true, immediate = false } = {}) {
     const def = getShapeDef();
+    const rangesByKey = getSliderRanges();
     state.values = readValuesFromSliders();
     const computed = def.compute(state.values);
     const rows = def.metricRows(computed);
@@ -730,9 +772,9 @@ async function initGeometryExplorer() {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
     if (state.mode === '2d') {
-      draw2D(ctx, canvas, state.shape2d, state.values);
+      draw2D(ctx, canvas, state.shape2d, state.values, rangesByKey);
     } else {
-      draw3D(ctx, canvas, state.shape3d, state.values);
+      draw3D(ctx, canvas, state.shape3d, state.values, rangesByKey);
     }
 
     if (publish) {
@@ -752,7 +794,8 @@ async function initGeometryExplorer() {
     slidersRoot.innerHTML = '';
 
     const def = getShapeDef();
-    const ranges = def.ranges;
+    const rangesByKey = getSliderRanges();
+    const lockedSliders = runtimeConfig.ui?.lockedSliders === true;
 
     def.keys.forEach((key, index) => {
       const wrap = document.createElement('div');
@@ -766,6 +809,7 @@ async function initGeometryExplorer() {
       wrap.appendChild(mount);
       slidersRoot.appendChild(wrap);
 
+      const ranges = rangesByKey[key];
       const initial = state.values[key] ?? def.defaults[key];
       const slider = new NumericSlider(mount, {
         min: ranges.min,
@@ -774,6 +818,7 @@ async function initGeometryExplorer() {
         value: initial,
         showInputs: true,
         continuousUpdates: true,
+        disabled: lockedSliders,
         onChange: () => syncMetrics(),
       });
       sliders.push(slider);
@@ -801,7 +846,7 @@ async function initGeometryExplorer() {
 
   function applyModeShapeDefaults() {
     const def = getShapeDef();
-    state.values = { ...def.defaults };
+    state.values = normalizeValues(def, def.defaults, getSliderRanges());
   }
 
   modeSelect.addEventListener('change', () => {
