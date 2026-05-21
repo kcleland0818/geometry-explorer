@@ -144,6 +144,10 @@
 }
 
 .bespoke .geometry-metric-value {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
   font-size: 0.9375rem;
   font-variant-numeric: tabular-nums;
   color: var(--Colors-Primary-Default);
@@ -151,6 +155,17 @@
   text-align: right;
   flex-shrink: 0;
   line-height: 1.35;
+}
+
+.bespoke .geometry-metric-primary {
+  color: var(--Colors-Primary-Default);
+}
+
+.bespoke .geometry-metric-alt {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--Colors-Text-Body-Subtle);
 }
 
 .bespoke .geometry-metric-hint {

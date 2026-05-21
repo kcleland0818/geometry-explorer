@@ -3,6 +3,7 @@
   "initialState": {
     "mode": "2d",
     "shape": "circle",
+    "units": "meters",
     "values": {
       "radius": 6
     }
