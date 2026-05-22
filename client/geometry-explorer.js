@@ -3,13 +3,129 @@
  */
 import NumericSlider from './design-system/components/numeric-slider/numeric-slider.js';
 
-const U = 'u';
-const U2 = 'u²';
-const U3 = 'u³';
 const DEFAULT_MODE = '2d';
 const DEFAULT_SHAPE_2D = 'rectangle';
 const DEFAULT_SHAPE_3D = 'prism';
+const DEFAULT_UNITS = 'meters';
+const METERS_PER_FOOT = 0.3048;
 const SNAPSHOT_DEBOUNCE_MS = 250;
+
+const UNIT_SYSTEMS = {
+  abstract: {
+    label: 'Abstract (u)',
+    linear: 'u',
+    area: 'u²',
+    volume: 'u³',
+  },
+  meters: {
+    label: 'Meters',
+    linear: 'm',
+    area: 'm²',
+    volume: 'm³',
+  },
+  feet: {
+    label: 'Feet',
+    linear: 'ft',
+    area: 'ft²',
+    volume: 'ft³',
+  },
+};
+
+function normalizeUnits(raw) {
+  if (raw === 'feet' || raw === 'ft') return 'feet';
+  if (raw === 'meters' || raw === 'meter' || raw === 'm') return 'meters';
+  if (raw === 'abstract' || raw === 'u') return 'abstract';
+  return DEFAULT_UNITS;
+}
+
+function getUnitLabels(units) {
+  return UNIT_SYSTEMS[normalizeUnits(units)] || UNIT_SYSTEMS[DEFAULT_UNITS];
+}
+
+function getAlternateUnits(units) {
+  const normalized = normalizeUnits(units);
+  if (normalized === 'meters') return 'feet';
+  if (normalized === 'feet') return 'meters';
+  return null;
+}
+
+function getUnitPower(unitKey) {
+  if (unitKey === 'area') return 2;
+  if (unitKey === 'volume') return 3;
+  return 1;
+}
+
+function convertBetweenUnits(value, fromUnits, toUnits, unitKey = 'linear') {
+  const from = normalizeUnits(fromUnits);
+  const to = normalizeUnits(toUnits);
+  if (from === to || from === 'abstract' || to === 'abstract') return value;
+  const power = getUnitPower(unitKey);
+  const metersPerUnit =
+    from === 'feet' ? METERS_PER_FOOT : from === 'meters' ? 1 : 1;
+  const metersValue = value * Math.pow(metersPerUnit, power);
+  const targetPerMeter =
+    to === 'feet' ? 1 / METERS_PER_FOOT : to === 'meters' ? 1 : 1;
+  return metersValue * Math.pow(targetPerMeter, power);
+}
+
+function convertLength(value, fromUnits, toUnits) {
+  return convertBetweenUnits(value, fromUnits, toUnits, 'linear');
+}
+
+function formatMeasurement(value, unitKey, units) {
+  const labels = getUnitLabels(units);
+  const primary = `${formatNumber(value)} ${labels[unitKey]}`;
+  const alternateUnits = getAlternateUnits(units);
+  if (!alternateUnits) {
+    return { primary, alternate: null };
+  }
+  const altValue = convertBetweenUnits(value, units, alternateUnits, unitKey);
+  const altLabels = getUnitLabels(alternateUnits);
+  return {
+    primary,
+    alternate: `≈ ${formatNumber(altValue)} ${altLabels[unitKey]}`,
+  };
+}
+
+function formatDimensionLabel(value, units) {
+  const labels = getUnitLabels(units);
+  if (normalizeUnits(units) === 'abstract') {
+    return String(value);
+  }
+  return `${formatNumber(value)} ${labels.linear}`;
+}
+
+function snapSliderValue(value, ranges) {
+  return snapToStep(value, ranges.min, ranges.step);
+}
+
+function unitsNoteText(units, mode) {
+  const normalized = normalizeUnits(units);
+  if (normalized === 'abstract') {
+    return mode === '2d'
+      ? 'Units are abstract (u). Perimeter and circumference are in u; area is in u².'
+      : '3D figures use surface area (u²) and volume (u³). Perimeter applies to flat shapes; for solids we use surface area.';
+  }
+
+  const labels = getUnitLabels(normalized);
+  const alternate = getAlternateUnits(normalized);
+  const altLabels = getUnitLabels(alternate);
+  const conversionNote =
+    normalized === 'meters'
+      ? `1 m = ${formatNumber(1 / METERS_PER_FOOT)} ft`
+      : `1 ft = ${formatNumber(METERS_PER_FOOT)} m`;
+
+  if (mode === '2d') {
+    return `Lengths in ${labels.linear}; area in ${labels.area}. ≈ ${altLabels.linear}/${altLabels.area} (${conversionNote}).`;
+  }
+  return `Lengths in ${labels.linear}; area in ${labels.area}; volume in ${labels.volume}. ≈ ${altLabels.linear}/${altLabels.area}/${altLabels.volume} (${conversionNote}).`;
+}
+
+function paramLabelWithUnits(label, units) {
+  const normalized = normalizeUnits(units);
+  if (normalized === 'abstract') return label;
+  return `${label} (${getUnitLabels(normalized).linear})`;
+}
 
 function formatNumber(n) {
   if (!Number.isFinite(n)) return '—';
@@ -45,10 +161,12 @@ const SHAPES_2D = {
         area: w * h,
       };
     },
-    metricRows(m) {
+    metricRows(m, units) {
+      const perimeter = formatMeasurement(m.perimeter, 'linear', units);
+      const area = formatMeasurement(m.area, 'area', units);
       return [
-        { name: 'Perimeter', value: `${formatNumber(m.perimeter)} ${U}`, hint: 'P = 2(w + h)' },
-        { name: 'Area', value: `${formatNumber(m.area)} ${U2}`, hint: 'A = w × h' },
+        { name: 'Perimeter', ...perimeter, hint: 'P = 2(w + h)' },
+        { name: 'Area', ...area, hint: 'A = w × h' },
       ];
     },
   },
@@ -65,14 +183,16 @@ const SHAPES_2D = {
         area: Math.PI * r * r,
       };
     },
-    metricRows(m) {
+    metricRows(m, units) {
+      const perimeter = formatMeasurement(m.perimeter, 'linear', units);
+      const area = formatMeasurement(m.area, 'area', units);
       return [
         {
           name: 'Circumference',
-          value: `${formatNumber(m.perimeter)} ${U}`,
+          ...perimeter,
           hint: 'Same idea as perimeter for a circle: C = 2πr',
         },
-        { name: 'Area', value: `${formatNumber(m.area)} ${U2}`, hint: 'A = πr²' },
+        { name: 'Area', ...area, hint: 'A = πr²' },
       ];
     },
   },
@@ -90,14 +210,16 @@ const SHAPES_2D = {
         area: (a * b) / 2,
       };
     },
-    metricRows(m) {
+    metricRows(m, units) {
+      const perimeter = formatMeasurement(m.perimeter, 'linear', units);
+      const area = formatMeasurement(m.area, 'area', units);
       return [
         {
           name: 'Perimeter',
-          value: `${formatNumber(m.perimeter)} ${U}`,
+          ...perimeter,
           hint: 'Sum of all three sides (includes hypotenuse)',
         },
-        { name: 'Area', value: `${formatNumber(m.area)} ${U2}`, hint: 'A = ½ × a × b' },
+        { name: 'Area', ...area, hint: 'A = ½ × a × b' },
       ];
     },
   },
@@ -117,14 +239,16 @@ const SHAPES_3D = {
         volume: l * w * h,
       };
     },
-    metricRows(m) {
+    metricRows(m, units) {
+      const surfaceArea = formatMeasurement(m.surfaceArea, 'area', units);
+      const volume = formatMeasurement(m.volume, 'volume', units);
       return [
         {
           name: 'Surface area',
-          value: `${formatNumber(m.surfaceArea)} ${U2}`,
+          ...surfaceArea,
           hint: 'Total area of all faces',
         },
-        { name: 'Volume', value: `${formatNumber(m.volume)} ${U3}`, hint: 'V = l × w × h' },
+        { name: 'Volume', ...volume, hint: 'V = l × w × h' },
       ];
     },
   },
@@ -143,14 +267,16 @@ const SHAPES_3D = {
         volume: Math.PI * r * r * h,
       };
     },
-    metricRows(m) {
+    metricRows(m, units) {
+      const surfaceArea = formatMeasurement(m.surfaceArea, 'area', units);
+      const volume = formatMeasurement(m.volume, 'volume', units);
       return [
         {
           name: 'Surface area',
-          value: `${formatNumber(m.surfaceArea)} ${U2}`,
+          ...surfaceArea,
           hint: 'SA = 2πr² + 2πrh',
         },
-        { name: 'Volume', value: `${formatNumber(m.volume)} ${U3}`, hint: 'V = πr²h' },
+        { name: 'Volume', ...volume, hint: 'V = πr²h' },
       ];
     },
   },
@@ -167,14 +293,16 @@ const SHAPES_3D = {
         volume: (4 / 3) * Math.PI * r * r * r,
       };
     },
-    metricRows(m) {
+    metricRows(m, units) {
+      const surfaceArea = formatMeasurement(m.surfaceArea, 'area', units);
+      const volume = formatMeasurement(m.volume, 'volume', units);
       return [
         {
           name: 'Surface area',
-          value: `${formatNumber(m.surfaceArea)} ${U2}`,
+          ...surfaceArea,
           hint: 'SA = 4πr²',
         },
-        { name: 'Volume', value: `${formatNumber(m.volume)} ${U3}`, hint: 'V = (4/3)πr³' },
+        { name: 'Volume', ...volume, hint: 'V = (4/3)πr³' },
       ];
     },
   },
@@ -210,13 +338,33 @@ function normalizeSliderRangeFragment(raw) {
   return Object.keys(out).length ? out : null;
 }
 
-function resolveSliderRanges(def, sliderConfig) {
+function pickSliderConfigForUnits(sliderConfig, units) {
+  if (!sliderConfig || typeof sliderConfig !== 'object' || Array.isArray(sliderConfig)) {
+    return sliderConfig;
+  }
+  const unitKey = normalizeUnits(units);
+  const unitOverrides = sliderConfig[unitKey];
+  if (
+    unitOverrides &&
+    typeof unitOverrides === 'object' &&
+    !Array.isArray(unitOverrides) &&
+    (unitOverrides.meters === undefined &&
+      unitOverrides.feet === undefined &&
+      unitOverrides.abstract === undefined)
+  ) {
+    return unitOverrides;
+  }
+  return sliderConfig;
+}
+
+function resolveSliderRanges(def, sliderConfig, units = DEFAULT_UNITS) {
+  const scopedConfig = pickSliderConfigForUnits(sliderConfig, units);
   const base = def.ranges;
-  const global = normalizeSliderRangeFragment(sliderConfig);
+  const global = normalizeSliderRangeFragment(scopedConfig);
   const out = {};
   def.keys.forEach((key) => {
     const keyFrag = normalizeSliderRangeFragment(
-      sliderConfig && typeof sliderConfig === 'object' ? sliderConfig[key] : null,
+      scopedConfig && typeof scopedConfig === 'object' ? scopedConfig[key] : null,
     );
     let min = keyFrag?.min ?? global?.min ?? base.min;
     let max = keyFrag?.max ?? global?.max ?? base.max;
@@ -263,13 +411,24 @@ function normalizeInitialState(config) {
     ? requestedShape
     : fallbackShape;
   const def = catalog[shape];
-  const rangesByKey = resolveSliderRanges(def, config?.sliders);
-  const values = normalizeValues(def, initial.values, rangesByKey);
+  const units = normalizeUnits(initial.units ?? config?.units);
+  const rangesByKey = resolveSliderRanges(def, config?.sliders, units);
+  const displayRanges = {};
+  def.keys.forEach((key) => {
+    const ranges = rangesByKey[key];
+    displayRanges[key] = {
+      min: ranges.min,
+      max: ranges.max,
+      step: ranges.step,
+    };
+  });
+  const values = normalizeValues(def, initial.values, displayRanges);
 
   return {
     mode: requestedMode,
     shape2d: requestedMode === '2d' ? shape : DEFAULT_SHAPE_2D,
     shape3d: requestedMode === '3d' ? shape : DEFAULT_SHAPE_3D,
+    units,
     values,
   };
 }
@@ -294,12 +453,13 @@ function buildSnapshot(state, metrics) {
     version: 1,
     mode: state.mode,
     shape: getCurrentShapeKey(state),
+    units: state.units,
     values: { ...state.values },
     metrics: { ...metrics },
   };
 }
 
-function draw2D(ctx, canvas, shapeKey, values, rangesByKey = {}) {
+function draw2D(ctx, canvas, shapeKey, values, rangesByKey = {}, units = DEFAULT_UNITS) {
   const { w, h } = getLogicalCanvasSize(canvas);
   ctx.clearRect(0, 0, w, h);
   ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--Colors-Backgrounds-Main-Default') || '#fff';
@@ -356,8 +516,8 @@ function draw2D(ctx, canvas, shapeKey, values, rangesByKey = {}) {
 
     ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--Colors-Text-Body-Default') || '#334155';
     ctx.font = '600 14px Work Sans, sans-serif';
-    ctx.fillText(`w = ${rw}`, x0 + bw / 2 - 18, y0 - 10);
-    ctx.fillText(`h = ${rh}`, x0 + bw + 8, y0 + bh / 2);
+    ctx.fillText(`w = ${formatDimensionLabel(rw, units)}`, x0 + bw / 2 - 18, y0 - 10);
+    ctx.fillText(`h = ${formatDimensionLabel(rh, units)}`, x0 + bw + 8, y0 + bh / 2);
   } else if (shapeKey === 'circle') {
     const r = values.radius;
     const rMax = rangesByKey.radius?.max ?? SHAPES_2D.circle.ranges.max;
@@ -373,7 +533,7 @@ function draw2D(ctx, canvas, shapeKey, values, rangesByKey = {}) {
     ctx.stroke();
     ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--Colors-Text-Body-Default') || '#334155';
     ctx.font = '600 13px Work Sans, sans-serif';
-    ctx.fillText(`r = ${r}`, cx + rad * 0.38, cy - rad * 0.42);
+    ctx.fillText(`r = ${formatDimensionLabel(r, units)}`, cx + rad * 0.38, cy - rad * 0.42);
   } else if (shapeKey === 'rightTriangle') {
     const a = values.legA;
     const b = values.legB;
@@ -427,12 +587,12 @@ function draw2D(ctx, canvas, shapeKey, values, rangesByKey = {}) {
 
     ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--Colors-Text-Body-Default') || '#334155';
     ctx.font = '600 14px Work Sans, sans-serif';
-    ctx.fillText(`a = ${a}`, x0 + bx / 2 - 10, y0 + 18);
-    ctx.fillText(`b = ${b}`, x0 - 28, y0 - ay / 2);
+    ctx.fillText(`a = ${formatDimensionLabel(a, units)}`, x0 + bx / 2 - 10, y0 + 18);
+    ctx.fillText(`b = ${formatDimensionLabel(b, units)}`, x0 - 28, y0 - ay / 2);
   }
 }
 
-function draw3D(ctx, canvas, shapeKey, values, rangesByKey = {}) {
+function draw3D(ctx, canvas, shapeKey, values, rangesByKey = {}, units = DEFAULT_UNITS) {
   const { w, h } = getLogicalCanvasSize(canvas);
   ctx.clearRect(0, 0, w, h);
   const bg = getComputedStyle(document.documentElement).getPropertyValue('--Colors-Backgrounds-Main-Default') || '#fff';
@@ -561,12 +721,12 @@ function draw3D(ctx, canvas, shapeKey, values, rangesByKey = {}) {
     ctx.font = '600 12px Work Sans, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
-    ctx.fillText(`ℓ=${L}`, midLen.x, midLen.y + 10);
+    ctx.fillText(`ℓ=${formatDimensionLabel(L, units)}`, midLen.x, midLen.y + 10);
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
-    ctx.fillText(`w=${W}`, midWid.x + 10, midWid.y + 4);
+    ctx.fillText(`w=${formatDimensionLabel(W, units)}`, midWid.x + 10, midWid.y + 4);
     ctx.textAlign = 'left';
-    ctx.fillText(`h=${H}`, midHt.x + 12, midHt.y);
+    ctx.fillText(`h=${formatDimensionLabel(H, units)}`, midHt.x + 12, midHt.y);
     ctx.textAlign = 'start';
     ctx.textBaseline = 'alphabetic';
   } else if (shapeKey === 'cylinder') {
@@ -603,8 +763,8 @@ function draw3D(ctx, canvas, shapeKey, values, rangesByKey = {}) {
 
     ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--Colors-Text-Body-Default') || '#334155';
     ctx.font = '12px Work Sans, sans-serif';
-    ctx.fillText(`r=${r}`, cx + rw / 2 + 6, cy);
-    ctx.fillText(`h=${ht}`, cx - rw / 2 - 28, cy);
+    ctx.fillText(`r=${formatDimensionLabel(r, units)}`, cx + rw / 2 + 6, cy);
+    ctx.fillText(`h=${formatDimensionLabel(ht, units)}`, cx - rw / 2 - 28, cy);
   } else if (shapeKey === 'sphere') {
     const r = values.radius;
     const rMax = rangesByKey.radius?.max ?? SHAPES_3D.sphere.ranges.max;
@@ -648,7 +808,7 @@ function draw3D(ctx, canvas, shapeKey, values, rangesByKey = {}) {
 
     ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--Colors-Text-Body-Default') || '#334155';
     ctx.font = '600 12px Work Sans, sans-serif';
-    ctx.fillText(`r=${r}`, cx + rad * 0.32, cy + rad * 0.52);
+    ctx.fillText(`r=${formatDimensionLabel(r, units)}`, cx + rad * 0.32, cy + rad * 0.52);
   }
 }
 
@@ -656,6 +816,7 @@ async function initGeometryExplorer() {
   const canvas = document.getElementById('geometry-canvas');
   const modeSelect = document.getElementById('geometry-mode');
   const shapeSelect = document.getElementById('geometry-shape');
+  const unitsSelect = document.getElementById('geometry-units');
   const slidersRoot = document.getElementById('geometry-sliders');
   const metricsList = document.getElementById('geometry-metrics');
   const formulaEl = document.getElementById('geometry-formula-note');
@@ -673,9 +834,15 @@ async function initGeometryExplorer() {
 
   function readValuesFromSliders() {
     const def = getShapeDef();
+    const rangesByKey = getSliderRanges();
     const out = {};
     def.keys.forEach((key, i) => {
-      out[key] = sliders[i]?.getValue?.() ?? def.defaults[key];
+      const raw = sliders[i]?.getValue?.() ?? state.values[key] ?? def.defaults[key];
+      const snapped = snapSliderValue(raw, rangesByKey[key]);
+      if (sliders[i] && sliders[i].getValue() !== snapped) {
+        sliders[i].setValue(snapped, null, false);
+      }
+      out[key] = snapped;
     });
     return out;
   }
@@ -714,13 +881,48 @@ async function initGeometryExplorer() {
     const ui = runtimeConfig.ui || {};
     modeSelect.disabled = ui.lockedMode === true;
     shapeSelect.disabled = ui.lockedShape === true;
+    if (unitsSelect) {
+      unitsSelect.disabled = ui.lockedUnits === true;
+    }
     if (formulaEl) {
       formulaEl.hidden = ui.showFormulaHints === false;
     }
   }
 
+  function populateUnitsOptions() {
+    if (!unitsSelect) return;
+    unitsSelect.innerHTML = '';
+    Object.entries(UNIT_SYSTEMS).forEach(([key, system]) => {
+      const opt = document.createElement('option');
+      opt.value = key;
+      opt.textContent = system.label;
+      unitsSelect.appendChild(opt);
+    });
+    unitsSelect.value = state.units;
+  }
+
+  function convertStateValuesToUnits(nextUnits) {
+    const currentUnits = state.units;
+    if (currentUnits === nextUnits) return;
+    const def = getShapeDef();
+    const targetRanges = getSliderRangesForUnits(nextUnits);
+    const converted = {};
+    def.keys.forEach((key) => {
+      const ranges = targetRanges[key];
+      const convertedValue = convertLength(state.values[key], currentUnits, nextUnits);
+      const clamped = Math.min(ranges.max, Math.max(ranges.min, convertedValue));
+      converted[key] = snapSliderValue(clamped, ranges);
+    });
+    state.values = converted;
+    state.units = nextUnits;
+  }
+
+  function getSliderRangesForUnits(units) {
+    return resolveSliderRanges(getShapeDef(), runtimeConfig.sliders, units);
+  }
+
   function getSliderRanges() {
-    return resolveSliderRanges(getShapeDef(), runtimeConfig.sliders);
+    return getSliderRangesForUnits(state.units);
   }
 
   function syncMetrics({ publish = true, immediate = false } = {}) {
@@ -728,27 +930,25 @@ async function initGeometryExplorer() {
     const rangesByKey = getSliderRanges();
     state.values = readValuesFromSliders();
     const computed = def.compute(state.values);
-    const rows = def.metricRows(computed);
+    const rows = def.metricRows(computed, state.units);
+    const showHints = runtimeConfig.ui?.showFormulaHints !== false;
     metricsList.innerHTML = rows
       .map(
         (row) => `<li class="geometry-metric-row">
         <div class="geometry-metric-head">
           <span class="geometry-metric-name">${row.name}</span>
-          <span class="geometry-metric-value">${row.value}</span>
+          <span class="geometry-metric-value">
+            <span class="geometry-metric-primary">${row.primary}</span>
+            ${row.alternate ? `<span class="geometry-metric-alt">${row.alternate}</span>` : ''}
+          </span>
         </div>
-        <p class="geometry-metric-hint">${row.hint}</p>
+        ${showHints ? `<p class="geometry-metric-hint">${row.hint}</p>` : ''}
       </li>`,
       )
       .join('');
 
     if (formulaEl) {
-      if (state.mode === '2d') {
-        formulaEl.textContent =
-          'Units are abstract (u). Perimeter and circumference are in u; area is in u².';
-      } else {
-        formulaEl.textContent =
-          '3D figures use surface area (u²) and volume (u³). Perimeter applies to flat shapes; for solids we use surface area.';
-      }
+      formulaEl.textContent = unitsNoteText(state.units, state.mode);
     }
 
     const dpr = window.devicePixelRatio || 1;
@@ -772,9 +972,9 @@ async function initGeometryExplorer() {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
     if (state.mode === '2d') {
-      draw2D(ctx, canvas, state.shape2d, state.values, rangesByKey);
+      draw2D(ctx, canvas, state.shape2d, state.values, rangesByKey, state.units);
     } else {
-      draw3D(ctx, canvas, state.shape3d, state.values, rangesByKey);
+      draw3D(ctx, canvas, state.shape3d, state.values, rangesByKey, state.units);
     }
 
     if (publish) {
@@ -796,13 +996,14 @@ async function initGeometryExplorer() {
     const def = getShapeDef();
     const rangesByKey = getSliderRanges();
     const lockedSliders = runtimeConfig.ui?.lockedSliders === true;
+    slidersRoot.classList.toggle('geometry-sliders--multi', def.keys.length >= 3);
 
     def.keys.forEach((key, index) => {
       const wrap = document.createElement('div');
       wrap.className = 'geometry-slider-block';
       const lab = document.createElement('span');
       lab.className = 'geometry-control-label';
-      lab.textContent = def.paramLabels[index];
+      lab.textContent = paramLabelWithUnits(def.paramLabels[index], state.units);
       const mount = document.createElement('div');
       mount.id = `geom-slider-${key}`;
       wrap.appendChild(lab);
@@ -810,7 +1011,8 @@ async function initGeometryExplorer() {
       slidersRoot.appendChild(wrap);
 
       const ranges = rangesByKey[key];
-      const initial = state.values[key] ?? def.defaults[key];
+      const initial = snapSliderValue(state.values[key] ?? def.defaults[key], ranges);
+      state.values[key] = initial;
       const slider = new NumericSlider(mount, {
         min: ranges.min,
         max: ranges.max,
@@ -868,6 +1070,14 @@ async function initGeometryExplorer() {
     syncMetrics();
   });
 
+  if (unitsSelect) {
+    unitsSelect.addEventListener('change', () => {
+      convertStateValuesToUnits(normalizeUnits(unitsSelect.value));
+      rebuildSliders();
+      syncMetrics();
+    });
+  }
+
   const frameEl = canvas.parentElement;
   const ro = new ResizeObserver(() => {
     syncMetrics({ publish: false });
@@ -878,6 +1088,7 @@ async function initGeometryExplorer() {
 
   applyUiConfig();
   modeSelect.value = state.mode;
+  populateUnitsOptions();
   populateShapeOptions();
   rebuildSliders();
   syncMetrics({ immediate: true });

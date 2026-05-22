@@ -1,7 +1,11 @@
 /* Geometry Explorer — sidebar stack + canvas fills main area */
 
 .bespoke {
+  height: 100vh;
   min-height: 100vh;
+  max-height: 100vh;
+  overflow: hidden;
+  overflow-x: hidden;
   display: flex;
   flex-direction: column;
 }
@@ -9,73 +13,114 @@
 .bespoke > main.main-layout.geometry-main {
   flex: 1;
   min-height: 0;
+  overflow: hidden;
 }
 
 /* More room for the figure: narrower sidebar, main column grows */
 .bespoke .main-layout.geometry-main {
-  grid-template-columns: minmax(300px, 380px) minmax(0, 1fr);
+  grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);
   flex: 1;
-  min-height: calc(100vh - 42px);
+  min-height: 0;
   height: auto;
 }
 
 .bespoke .geometry-main > .geometry-sidebar,
 .bespoke .geometry-main > .geometry-content {
   min-height: 0;
+  overflow: hidden;
 }
 
 .bespoke .geometry-sidebar {
-  padding: var(--UI-Spacing-spacing-ml) var(--UI-Spacing-spacing-s);
+  padding: var(--UI-Spacing-spacing-s);
   display: flex;
   flex-direction: column;
-  overflow: auto;
+  min-height: 0;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
 }
 
 /* Single card: Shape → Measurements → Dimensions */
 .bespoke .geometry-sidebar-stack {
   display: flex;
   flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  max-width: 100%;
+  width: 100%;
   gap: 0;
   margin: 0;
-  padding: var(--UI-Spacing-spacing-ml) var(--UI-Spacing-spacing-ml);
+  padding: var(--UI-Spacing-spacing-ms) var(--UI-Spacing-spacing-mxs);
+  overflow: hidden;
+  box-sizing: border-box;
 }
 
 .bespoke .geometry-panel-section {
-  padding: var(--UI-Spacing-spacing-ml) 0;
+  padding: var(--UI-Spacing-spacing-s) 0;
+  flex-shrink: 0;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .bespoke .geometry-panel-section + .geometry-panel-section {
   border-top: 1px solid var(--Colors-Stroke-Default);
-  margin-top: var(--UI-Spacing-spacing-s);
-  padding-top: var(--UI-Spacing-spacing-ml);
+  margin-top: var(--UI-Spacing-spacing-xs);
+  padding-top: var(--UI-Spacing-spacing-s);
 }
 
 .bespoke .geometry-panel-section--sliders {
   padding-bottom: 0;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.bespoke .geometry-panel-section--sliders #geometry-sliders {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* Rectangular prism (3 sliders): tighter spacing, scroll only this block */
+.bespoke .geometry-sliders--multi .geometry-slider-block {
+  margin-bottom: var(--UI-Spacing-spacing-ms);
+}
+
+.bespoke .geometry-panel-section--sliders:has(.geometry-sliders--multi) .geometry-panel-lede {
+  display: none;
 }
 
 .bespoke .geometry-card-title {
-  margin: 0 0 var(--UI-Spacing-spacing-s) 0;
-  padding-bottom: var(--UI-Spacing-spacing-xs);
+  margin: 0 0 var(--UI-Spacing-spacing-xs) 0;
+  padding-bottom: 0;
   border-bottom: none;
-  font-size: 1rem;
+  font-size: 0.9375rem;
   font-weight: 700;
-  line-height: 1.3;
+  line-height: 1.25;
   color: var(--Colors-Text-Body-Strongest);
 }
 
 .bespoke .geometry-panel-lede {
-  margin: 0 0 var(--UI-Spacing-spacing-ml) 0;
-  line-height: 1.5;
+  margin: 0 0 var(--UI-Spacing-spacing-s) 0;
+  line-height: 1.45;
   color: var(--Colors-Text-Body-Subtle);
   font-size: 0.8125rem;
 }
 
 .bespoke label.geometry-field-label {
   display: block;
-  margin: 0 0 var(--UI-Spacing-spacing-xxs) 0;
-  font-size: 0.875rem;
-  line-height: 1.45;
+  margin: 0 0 2px 0;
+  font-size: 0.8125rem;
+  line-height: 1.35;
   color: var(--Colors-Text-Body-Stronger);
   font-weight: 600;
 }
@@ -85,7 +130,7 @@
 }
 
 .bespoke .geometry-field--compact {
-  margin-bottom: var(--UI-Spacing-spacing-s);
+  margin-bottom: var(--UI-Spacing-spacing-xs);
 }
 
 .bespoke .geometry-field--compact:last-of-type {
@@ -103,13 +148,13 @@
 
 .bespoke .geometry-select {
   width: 100%;
-  padding: var(--UI-Spacing-spacing-s) var(--UI-Spacing-spacing-ml);
+  padding: var(--UI-Spacing-spacing-xs) var(--UI-Spacing-spacing-s);
   border-radius: var(--UI-Radius-radius-s);
   border: 1px solid var(--Colors-Stroke-Default);
   background: var(--Colors-Backgrounds-Main-Default);
   color: var(--Colors-Text-Body-Default);
-  font-size: 0.875rem;
-  line-height: 1.45;
+  font-size: 0.8125rem;
+  line-height: 1.35;
 }
 
 .bespoke .geometry-metrics {
@@ -118,11 +163,11 @@
   list-style: none;
   display: flex;
   flex-direction: column;
-  gap: var(--UI-Spacing-spacing-s);
+  gap: var(--UI-Spacing-spacing-xs);
 }
 
 .bespoke .geometry-metric-row {
-  padding: var(--UI-Spacing-spacing-s) var(--UI-Spacing-spacing-ml);
+  padding: var(--UI-Spacing-spacing-xs) var(--UI-Spacing-spacing-s);
   border-radius: var(--UI-Radius-radius-s);
   background: var(--Colors-Backgrounds-Main-Top);
   border: 1px solid var(--Colors-Stroke-Default);
@@ -131,48 +176,70 @@
 .bespoke .geometry-metric-head {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
-  gap: var(--UI-Spacing-spacing-ml);
-  margin-bottom: var(--UI-Spacing-spacing-xxs);
+  align-items: center;
+  gap: var(--UI-Spacing-spacing-s);
+  min-width: 0;
 }
 
 .bespoke .geometry-metric-name {
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
   font-weight: 600;
-  line-height: 1.4;
+  line-height: 1.35;
   color: var(--Colors-Text-Body-Strongest);
+  min-width: 0;
+  flex-shrink: 1;
 }
 
 .bespoke .geometry-metric-value {
-  font-size: 0.9375rem;
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: var(--UI-Spacing-spacing-xxs);
+  font-size: 0.875rem;
   font-variant-numeric: tabular-nums;
   color: var(--Colors-Primary-Default);
   font-weight: 700;
   text-align: right;
-  flex-shrink: 0;
-  line-height: 1.35;
+  flex-shrink: 1;
+  min-width: 0;
+  line-height: 1.3;
+}
+
+.bespoke .geometry-metric-primary {
+  color: var(--Colors-Primary-Default);
+}
+
+.bespoke .geometry-metric-alt {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--Colors-Text-Body-Subtle);
 }
 
 .bespoke .geometry-metric-hint {
-  margin: 0;
-  font-size: 0.75rem;
-  line-height: 1.5;
+  margin: var(--UI-Spacing-spacing-xxs) 0 0 0;
+  font-size: 0.6875rem;
+  line-height: 1.4;
   color: var(--Colors-Text-Body-Subtle);
 }
 
 /* Units note sits directly under the metric rows */
 .bespoke .geometry-units-note {
-  margin-top: var(--UI-Spacing-spacing-s);
+  margin-top: var(--UI-Spacing-spacing-xs);
   margin-bottom: 0;
-  padding-top: var(--UI-Spacing-spacing-xs);
+  padding-top: var(--UI-Spacing-spacing-xxs);
   border-top: 1px dashed var(--Colors-Stroke-Default);
-  font-size: 0.75rem;
-  line-height: 1.55;
+  font-size: 0.6875rem;
+  line-height: 1.4;
   color: var(--Colors-Text-Body-Subtle);
 }
 
 .bespoke .geometry-slider-block {
   margin-bottom: var(--UI-Spacing-spacing-xl);
+  min-width: 0;
+  max-width: 100%;
 }
 
 .bespoke .geometry-slider-block:last-child {
@@ -183,14 +250,16 @@
 .bespoke .geometry-panel-section--sliders .numeric-slider-container.with-inputs {
   flex-direction: row;
   align-items: center;
-  gap: var(--UI-Spacing-spacing-ml);
+  gap: var(--UI-Spacing-spacing-s);
+  min-width: 0;
+  max-width: 100%;
 }
 
 .bespoke .geometry-panel-section--sliders .numeric-slider-container.with-inputs .numeric-slider-input {
   order: 0;
-  width: 4.25rem;
-  max-width: none;
-  min-width: 3.5rem;
+  width: 3.75rem;
+  max-width: 3.75rem;
+  min-width: 3.25rem;
   min-height: 2.5rem;
   flex-shrink: 0;
   padding: var(--UI-Spacing-spacing-xs) var(--UI-Spacing-spacing-s);
@@ -204,6 +273,8 @@
   flex: 1;
   min-width: 0;
   height: 22px;
+  padding: 0 11px;
+  box-sizing: border-box;
 }
 
 .bespoke .geometry-panel-section--sliders .numeric-slider-track {
@@ -243,7 +314,7 @@
 
 .bespoke .geometry-canvas-frame {
   flex: 1;
-  min-height: min(72vh, 900px);
+  min-height: 0;
   width: 100%;
   display: flex;
   align-items: center;
@@ -284,15 +355,28 @@
 }
 
 @media (max-width: 768px) {
+  .bespoke {
+    height: auto;
+    min-height: 100vh;
+    max-height: none;
+    overflow: auto;
+  }
+
   .bespoke .main-layout.geometry-main {
     grid-template-columns: 1fr;
-    grid-template-rows: auto minmax(280px, 55vh);
+    grid-template-rows: auto minmax(240px, 45vh);
+    overflow: visible;
   }
 
   .bespoke .geometry-sidebar {
     border-right: none;
     border-bottom: 1px solid var(--Colors-Stroke-Default);
     max-height: none;
+    overflow: visible;
+  }
+
+  .bespoke .geometry-sidebar-stack {
+    overflow: visible;
   }
 
   .bespoke .geometry-canvas-frame {

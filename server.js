@@ -37,6 +37,7 @@ const DEFAULT_CONFIG = {
   initialState: {
     mode: '2d',
     shape: 'rectangle',
+    units: 'meters',
     values: {
       width: 8,
       height: 5
@@ -45,6 +46,8 @@ const DEFAULT_CONFIG = {
   ui: {
     lockedMode: false,
     lockedShape: false,
+    lockedSliders: false,
+    lockedUnits: false,
     showFormulaHints: true
   },
   evaluation: {}
@@ -138,6 +141,7 @@ function snapshotFromConfig() {
     source: 'config',
     mode: initialState.mode || DEFAULT_CONFIG.initialState.mode,
     shape: initialState.shape || initialState.shape2d || initialState.shape3d || DEFAULT_CONFIG.initialState.shape,
+    units: initialState.units || DEFAULT_CONFIG.initialState.units,
     values: initialState.values || DEFAULT_CONFIG.initialState.values,
     metrics: null,
     updatedAt: null
