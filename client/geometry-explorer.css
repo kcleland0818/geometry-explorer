@@ -8,6 +8,14 @@
   overflow-x: hidden;
   display: flex;
   flex-direction: column;
+  --geometry-grid-stroke: color-mix(in srgb, var(--Colors-Stroke-Stronger) 72%, var(--Colors-Primary-Default));
+  --geometry-shape-fill: #dbeafe;
+  --geometry-prism-face-fill-top: #e0f2fe;
+  --geometry-prism-face-fill-front: #bfdbfe;
+  --geometry-prism-face-fill-right: #bfdbfe;
+  --geometry-prism-face-fill-back: #93c5fd;
+  --geometry-prism-face-fill-left: #93c5fd;
+  --geometry-prism-face-fill-bottom: #93c5fd;
 }
 
 .bespoke > main.main-layout.geometry-main {
@@ -320,6 +328,22 @@
   align-items: center;
   justify-content: center;
   min-width: 0;
+  position: relative;
+}
+
+.bespoke .geometry-canvas-hint {
+  position: absolute;
+  bottom: var(--UI-Spacing-spacing-m);
+  left: 50%;
+  transform: translateX(-50%);
+  margin: 0;
+  padding: var(--UI-Spacing-spacing-xs) var(--UI-Spacing-spacing-ms);
+  border-radius: var(--UI-Radius-radius-s);
+  background: rgba(255, 255, 255, 0.88);
+  color: var(--Colors-Text-Body-Medium);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+  pointer-events: none;
+  user-select: none;
 }
 
 .bespoke #geometry-canvas {
@@ -327,6 +351,14 @@
   border-radius: var(--UI-Radius-radius-m);
   background: var(--Colors-Backgrounds-Main-Default);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.bespoke #geometry-canvas.geometry-canvas--rotatable {
+  cursor: grab;
+}
+
+.bespoke #geometry-canvas.geometry-canvas--dragging {
+  cursor: grabbing;
 }
 
 .bespoke .modal-overlay .modal-content {

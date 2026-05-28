@@ -10,6 +10,32 @@ const DEFAULT_UNITS = 'meters';
 const METERS_PER_FOOT = 0.3048;
 const SNAPSHOT_DEBOUNCE_MS = 250;
 
+const VIEW3D_DEFAULT = { yaw: 0.55, pitch: 0.42 };
+const VIEW3D_LIMITS = { yawMin: -1.35, yawMax: 1.35, pitchMin: 0.1, pitchMax: 1.05 };
+const VIEW3D_DRAG_SENSITIVITY = 0.0065;
+const GEOMETRY_GRID_LINE_WIDTH = 1.35;
+
+const PRISM_FACE_DEFS = [
+  { ids: [0, 1, 2, 3], grid: 'kMin' },
+  { ids: [4, 5, 6, 7], grid: 'kMax' },
+  { ids: [0, 1, 5, 4], grid: 'jMin' },
+  { ids: [1, 2, 6, 5], grid: 'iMax' },
+  { ids: [2, 3, 7, 6], grid: 'jMax' },
+  { ids: [3, 0, 4, 7], grid: 'iMin' },
+];
+
+const PRISM_EDGES = [
+  [0, 1], [1, 2], [2, 3], [3, 0],
+  [4, 5], [5, 6], [6, 7], [7, 4],
+  [0, 4], [1, 5], [2, 6], [3, 7],
+];
+
+const PRISM_EDGE_FACES = [
+  [0, 2], [0, 3], [0, 4], [0, 5],
+  [1, 2], [1, 3], [1, 4], [1, 5],
+  [2, 4], [2, 5], [3, 4], [3, 5],
+];
+
 const UNIT_SYSTEMS = {
   abstract: {
     label: 'Abstract (u)',
@@ -448,6 +474,241 @@ async function loadRuntimeConfig() {
   }
 }
 
+function getGeometryGridStrokeStyle() {
+  const rootStyle = getComputedStyle(document.documentElement);
+  const custom = rootStyle.getPropertyValue('--geometry-grid-stroke').trim();
+  if (custom) return custom;
+  const strong = rootStyle.getPropertyValue('--Colors-Stroke-Stronger').trim();
+  if (strong) return strong;
+  return 'hsla(218, 28%, 34%, 0.82)';
+}
+
+function applyGeometryGridStroke(ctx) {
+  ctx.strokeStyle = getGeometryGridStrokeStyle();
+  ctx.lineWidth = GEOMETRY_GRID_LINE_WIDTH;
+}
+
+function getGeometryShapeFillStyle() {
+  const fill = getComputedStyle(document.documentElement).getPropertyValue('--geometry-shape-fill').trim();
+  return fill || '#dbeafe';
+}
+
+const PRISM_FACE_FILL_VARS = {
+  kMin: '--geometry-prism-face-fill-bottom',
+  kMax: '--geometry-prism-face-fill-top',
+  jMin: '--geometry-prism-face-fill-front',
+  jMax: '--geometry-prism-face-fill-back',
+  iMax: '--geometry-prism-face-fill-right',
+  iMin: '--geometry-prism-face-fill-left',
+};
+
+function getPrismFaceFillStyle(gridKey) {
+  const varName = PRISM_FACE_FILL_VARS[gridKey];
+  if (varName) {
+    const fill = getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
+    if (fill) return fill;
+  }
+  return getGeometryShapeFillStyle();
+}
+
+function prism3DPoint(L, W, H, i, j, k) {
+  return {
+    x: -L / 2 + i,
+    y: -H / 2 + k,
+    z: -W / 2 + j,
+  };
+}
+
+function rotateProject3D(x, y, z, yaw, pitch) {
+  const cosY = Math.cos(yaw);
+  const sinY = Math.sin(yaw);
+  const cosX = Math.cos(pitch);
+  const sinX = Math.sin(pitch);
+  const x1 = x * cosY + z * sinY;
+  const z1 = -x * sinY + z * cosY;
+  const y2 = y * cosX - z1 * sinX;
+  const z2 = y * sinX + z1 * cosX;
+  return { x: x1, y: y2, depth: z2 };
+}
+
+function isProjectedFaceVisible(points) {
+  let area = 0;
+  for (let i = 0; i < points.length; i += 1) {
+    const p0 = points[i];
+    const p1 = points[(i + 1) % points.length];
+    area += (p1.x - p0.x) * (p1.y + p0.y);
+  }
+  return area < 0;
+}
+
+function buildPrismProjection(L, W, H, yaw, pitch, w, h, margin = 52) {
+  const samplePoints = [];
+  [0, L].forEach((i) => {
+    [0, W].forEach((j) => {
+      [0, H].forEach((k) => {
+        const p3 = prism3DPoint(L, W, H, i, j, k);
+        samplePoints.push(rotateProject3D(p3.x, p3.y, p3.z, yaw, pitch));
+      });
+    });
+  });
+
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minY = Infinity;
+  let maxY = -Infinity;
+  samplePoints.forEach((p) => {
+    minX = Math.min(minX, p.x);
+    maxX = Math.max(maxX, p.x);
+    minY = Math.min(minY, p.y);
+    maxY = Math.max(maxY, p.y);
+  });
+
+  const rawW = Math.max(maxX - minX, 1e-6);
+  const rawH = Math.max(maxY - minY, 1e-6);
+  const scale = Math.min((w - margin * 2) / rawW, (h - margin * 2) / rawH) * 0.9;
+  const cx = w / 2 - ((minX + maxX) / 2) * scale;
+  const cy = h / 2 + ((minY + maxY) / 2) * scale;
+
+  const project = (i, j, k) => {
+    const p3 = prism3DPoint(L, W, H, i, j, k);
+    const rotated = rotateProject3D(p3.x, p3.y, p3.z, yaw, pitch);
+    return {
+      x: cx + rotated.x * scale,
+      y: cy - rotated.y * scale,
+      depth: rotated.depth,
+    };
+  };
+
+  const verts = [
+    project(0, 0, 0),
+    project(L, 0, 0),
+    project(L, W, 0),
+    project(0, W, 0),
+    project(0, 0, H),
+    project(L, 0, H),
+    project(L, W, H),
+    project(0, W, H),
+  ];
+
+  return { project, verts };
+}
+
+function drawPrismFaceGrid(ctx, L, W, H, project, gridKey) {
+  const nL = Math.min(200, Math.max(0, Math.floor(L)));
+  const nW = Math.min(200, Math.max(0, Math.floor(W)));
+  const nH = Math.min(200, Math.max(0, Math.floor(H)));
+  if (nL === 0 || nW === 0 || nH === 0) return;
+
+  const line = (from, to) => {
+    const p0 = project(...from);
+    const p1 = project(...to);
+    ctx.beginPath();
+    ctx.moveTo(p0.x, p0.y);
+    ctx.lineTo(p1.x, p1.y);
+    ctx.stroke();
+  };
+
+  if (gridKey === 'jMin') {
+    for (let i = 1; i < nL; i += 1) line([i, 0, 0], [i, 0, nH]);
+    for (let k = 1; k < nH; k += 1) line([0, 0, k], [nL, 0, k]);
+  } else if (gridKey === 'jMax') {
+    for (let i = 1; i < nL; i += 1) line([i, nW, 0], [i, nW, nH]);
+    for (let k = 1; k < nH; k += 1) line([0, nW, k], [nL, nW, k]);
+  } else if (gridKey === 'iMin') {
+    for (let j = 1; j < nW; j += 1) line([0, j, 0], [0, j, nH]);
+    for (let k = 1; k < nH; k += 1) line([0, 0, k], [0, nW, k]);
+  } else if (gridKey === 'iMax') {
+    for (let j = 1; j < nW; j += 1) line([nL, j, 0], [nL, j, nH]);
+    for (let k = 1; k < nH; k += 1) line([nL, 0, k], [nL, nW, k]);
+  } else if (gridKey === 'kMin') {
+    for (let i = 1; i < nL; i += 1) line([i, 0, 0], [i, nW, 0]);
+    for (let j = 1; j < nW; j += 1) line([0, j, 0], [nL, j, 0]);
+  } else if (gridKey === 'kMax') {
+    for (let i = 1; i < nL; i += 1) line([i, 0, nH], [i, nW, nH]);
+    for (let j = 1; j < nW; j += 1) line([0, j, nH], [nL, j, nH]);
+  }
+}
+
+function drawPrism(ctx, canvas, values, units, view3d) {
+  const { w, h } = getLogicalCanvasSize(canvas);
+  const { length: L, width: W, height: H } = values;
+  const yaw = view3d?.yaw ?? VIEW3D_DEFAULT.yaw;
+  const pitch = view3d?.pitch ?? VIEW3D_DEFAULT.pitch;
+  const stroke = getComputedStyle(document.documentElement).getPropertyValue('--Colors-Primary-Default') || '#2563eb';
+  const strokeMuted = getComputedStyle(document.documentElement).getPropertyValue('--Colors-Stroke-Strong') || '#64748b';
+  const { project, verts } = buildPrismProjection(L, W, H, yaw, pitch, w, h);
+
+  const faces = PRISM_FACE_DEFS.map((face) => {
+    const points = face.ids.map((id) => verts[id]);
+    const avgDepth = points.reduce((sum, p) => sum + p.depth, 0) / points.length;
+    return {
+      ...face,
+      points,
+      visible: isProjectedFaceVisible(points),
+      avgDepth,
+    };
+  });
+
+  const visibleByFaceIndex = faces.map((face) => face.visible);
+  const sortedFaces = [...faces].sort((a, b) => a.avgDepth - b.avgDepth);
+
+  sortedFaces.forEach((face) => {
+    if (!face.visible) return;
+    ctx.fillStyle = getPrismFaceFillStyle(face.grid);
+    ctx.beginPath();
+    ctx.moveTo(face.points[0].x, face.points[0].y);
+    for (let i = 1; i < face.points.length; i += 1) ctx.lineTo(face.points[i].x, face.points[i].y);
+    ctx.closePath();
+    ctx.fill();
+  });
+
+  applyGeometryGridStroke(ctx);
+  sortedFaces.forEach((face) => {
+    if (!face.visible) return;
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(face.points[0].x, face.points[0].y);
+    for (let i = 1; i < face.points.length; i += 1) ctx.lineTo(face.points[i].x, face.points[i].y);
+    ctx.closePath();
+    ctx.clip();
+    drawPrismFaceGrid(ctx, L, W, H, project, face.grid);
+    ctx.restore();
+  });
+
+  ctx.lineWidth = 2.25;
+  PRISM_EDGES.forEach(([a, b], edgeIndex) => {
+    const [faceA, faceB] = PRISM_EDGE_FACES[edgeIndex];
+    const visible = visibleByFaceIndex[faceA] || visibleByFaceIndex[faceB];
+    ctx.strokeStyle = visible ? stroke : strokeMuted;
+    ctx.setLineDash(visible ? [] : [4, 4]);
+    ctx.beginPath();
+    ctx.moveTo(verts[a].x, verts[a].y);
+    ctx.lineTo(verts[b].x, verts[b].y);
+    ctx.stroke();
+  });
+  ctx.setLineDash([]);
+
+  const labelColor =
+    getComputedStyle(document.documentElement).getPropertyValue('--Colors-Text-Body-Default') || '#334155';
+  ctx.fillStyle = labelColor.trim() || '#334155';
+  ctx.font = '600 12px Work Sans, sans-serif';
+
+  const labelDefs = [
+    { text: `ℓ=${formatDimensionLabel(L, units)}`, from: [0, 0, 0], to: [L, 0, 0], dx: 0, dy: 12, align: 'center', baseline: 'top' },
+    { text: `w=${formatDimensionLabel(W, units)}`, from: [L, 0, 0], to: [L, W, 0], dx: 10, dy: 4, align: 'left', baseline: 'middle' },
+    { text: `h=${formatDimensionLabel(H, units)}`, from: [L, 0, 0], to: [L, 0, H], dx: 12, dy: 0, align: 'left', baseline: 'middle' },
+  ];
+  labelDefs.forEach((label) => {
+    const p0 = project(...label.from);
+    const p1 = project(...label.to);
+    ctx.textAlign = label.align;
+    ctx.textBaseline = label.baseline;
+    ctx.fillText(label.text, (p0.x + p1.x) / 2 + label.dx, (p0.y + p1.y) / 2 + label.dy);
+  });
+  ctx.textAlign = 'start';
+  ctx.textBaseline = 'alphabetic';
+}
+
 function buildSnapshot(state, metrics) {
   return {
     version: 1,
@@ -472,7 +733,7 @@ function draw2D(ctx, canvas, shapeKey, values, rangesByKey = {}, units = DEFAULT
   const cy = h / 2;
 
   ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--Colors-Primary-Default') || '#2563eb';
-  ctx.fillStyle = 'rgba(37, 99, 235, 0.12)';
+  ctx.fillStyle = getGeometryShapeFillStyle();
   ctx.lineWidth = 2;
 
   if (shapeKey === 'rectangle') {
@@ -488,11 +749,7 @@ function draw2D(ctx, canvas, shapeKey, values, rangesByKey = {}, units = DEFAULT
     ctx.fill();
     ctx.stroke();
 
-    const gridStroke =
-      getComputedStyle(document.documentElement).getPropertyValue('--Colors-Stroke-Medium') ||
-      'hsla(215, 16%, 47%, 0.35)';
-    ctx.strokeStyle = gridStroke.trim();
-    ctx.lineWidth = 1;
+    applyGeometryGridStroke(ctx);
     const cols = Math.min(200, Math.max(0, Math.floor(rw)));
     const rows = Math.min(200, Math.max(0, Math.floor(rh)));
     for (let i = 1; i < cols; i += 1) {
@@ -558,11 +815,7 @@ function draw2D(ctx, canvas, shapeKey, values, rangesByKey = {}, units = DEFAULT
     ctx.closePath();
     ctx.clip();
 
-    const gridStroke =
-      getComputedStyle(document.documentElement).getPropertyValue('--Colors-Stroke-Medium') ||
-      'hsla(215, 16%, 47%, 0.35)';
-    ctx.strokeStyle = gridStroke.trim();
-    ctx.lineWidth = 1;
+    applyGeometryGridStroke(ctx);
     const colsT = Math.min(200, Math.max(0, Math.floor(b)));
     const rowsT = Math.min(200, Math.max(0, Math.floor(a)));
     for (let i = 1; i < colsT; i += 1) {
@@ -592,7 +845,7 @@ function draw2D(ctx, canvas, shapeKey, values, rangesByKey = {}, units = DEFAULT
   }
 }
 
-function draw3D(ctx, canvas, shapeKey, values, rangesByKey = {}, units = DEFAULT_UNITS) {
+function draw3D(ctx, canvas, shapeKey, values, rangesByKey = {}, units = DEFAULT_UNITS, view3d = VIEW3D_DEFAULT) {
   const { w, h } = getLogicalCanvasSize(canvas);
   ctx.clearRect(0, 0, w, h);
   const bg = getComputedStyle(document.documentElement).getPropertyValue('--Colors-Backgrounds-Main-Default') || '#fff';
@@ -607,128 +860,8 @@ function draw3D(ctx, canvas, shapeKey, values, rangesByKey = {}, units = DEFAULT
   const cy = h / 2;
 
   if (shapeKey === 'prism') {
-    const { length: L, width: W, height: H } = values;
-    const maxDim = Math.max(L, W, H);
-    const margin = 52;
-    const s = (Math.min(w, h) * 0.3) / maxDim;
-    const dx = L * s * 0.65;
-    const dy = -H * s;
-    const wx = W * s * 0.55;
-    const wy = W * s * 0.28;
-
-    const base = [
-      { x: cx - dx / 2, y: cy + dy / 2 },
-      { x: cx + dx / 2, y: cy + dy / 2 },
-      { x: cx + dx / 2 + wx, y: cy + dy / 2 + wy },
-      { x: cx - dx / 2 + wx, y: cy + dy / 2 + wy },
-    ];
-    const top = base.map((p) => ({ x: p.x, y: p.y + dy }));
-
-    const all = [...base, ...top];
-    let minPx = Infinity;
-    let maxPx = -Infinity;
-    let minPy = Infinity;
-    let maxPy = -Infinity;
-    all.forEach((p) => {
-      minPx = Math.min(minPx, p.x);
-      maxPx = Math.max(maxPx, p.x);
-      minPy = Math.min(minPy, p.y);
-      maxPy = Math.max(maxPy, p.y);
-    });
-
-    let tx = (w - minPx - maxPx) / 2;
-
-    const bboxH = maxPy - minPy;
-    const availV = h - 2 * margin;
-    const tyCenter = margin + (availV - bboxH) / 2 - minPy;
-    const tyBottom = (h - margin) - maxPy;
-    const towardCenter = 0.52;
-    let ty = tyCenter * towardCenter + tyBottom * (1 - towardCenter);
-
-    if (minPy + ty < margin) {
-      ty = margin - minPy;
-    }
-    if (maxPy + ty > h - margin) {
-      ty = h - margin - maxPy;
-    }
-    if (minPy + ty < margin) {
-      ty = margin - minPy;
-    }
-
-    const shift = (p) => ({ x: p.x + tx, y: p.y + ty });
-    const baseT = base.map(shift);
-    const topT = top.map(shift);
-
-    ctx.fillStyle = 'rgba(37, 99, 235, 0.08)';
-    ctx.beginPath();
-    ctx.moveTo(baseT[0].x, baseT[0].y);
-    for (let i = 1; i < 4; i++) ctx.lineTo(baseT[i].x, baseT[i].y);
-    ctx.closePath();
-    ctx.fill();
-    ctx.strokeStyle = stroke;
-    ctx.stroke();
-
-    ctx.fillStyle = 'rgba(37, 99, 235, 0.14)';
-    ctx.beginPath();
-    ctx.moveTo(topT[0].x, topT[0].y);
-    ctx.lineTo(topT[1].x, topT[1].y);
-    ctx.lineTo(baseT[1].x, baseT[1].y);
-    ctx.lineTo(baseT[0].x, baseT[0].y);
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
-
-    ctx.fillStyle = 'rgba(37, 99, 235, 0.2)';
-    ctx.beginPath();
-    ctx.moveTo(topT[1].x, topT[1].y);
-    ctx.lineTo(topT[2].x, topT[2].y);
-    ctx.lineTo(baseT[2].x, baseT[2].y);
-    ctx.lineTo(baseT[1].x, baseT[1].y);
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
-
-    ctx.strokeStyle = strokeMuted;
-    ctx.setLineDash([4, 4]);
-    ctx.beginPath();
-    ctx.moveTo(baseT[2].x, baseT[2].y);
-    ctx.lineTo(baseT[3].x, baseT[3].y);
-    ctx.lineTo(baseT[0].x, baseT[0].y);
-    ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.strokeStyle = stroke;
-    ctx.beginPath();
-    for (let i = 0; i < 4; i++) {
-      ctx.moveTo(baseT[i].x, baseT[i].y);
-      ctx.lineTo(topT[i].x, topT[i].y);
-    }
-    ctx.stroke();
-
-    const midLen = {
-      x: (baseT[0].x + baseT[1].x) / 2,
-      y: (baseT[0].y + baseT[1].y) / 2,
-    };
-    const midWid = {
-      x: (baseT[1].x + baseT[2].x) / 2,
-      y: (baseT[1].y + baseT[2].y) / 2,
-    };
-    const midHt = {
-      x: (baseT[1].x + topT[1].x) / 2,
-      y: (baseT[1].y + topT[1].y) / 2,
-    };
-
-    ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--Colors-Text-Body-Default') || '#334155';
-    ctx.font = '600 12px Work Sans, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'top';
-    ctx.fillText(`ℓ=${formatDimensionLabel(L, units)}`, midLen.x, midLen.y + 10);
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(`w=${formatDimensionLabel(W, units)}`, midWid.x + 10, midWid.y + 4);
-    ctx.textAlign = 'left';
-    ctx.fillText(`h=${formatDimensionLabel(H, units)}`, midHt.x + 12, midHt.y);
-    ctx.textAlign = 'start';
-    ctx.textBaseline = 'alphabetic';
+    drawPrism(ctx, canvas, values, units, view3d);
+    return;
   } else if (shapeKey === 'cylinder') {
     const { radius: r, height: ht } = values;
     const maxDim = Math.max(r * 2, ht);
@@ -820,6 +953,7 @@ async function initGeometryExplorer() {
   const slidersRoot = document.getElementById('geometry-sliders');
   const metricsList = document.getElementById('geometry-metrics');
   const formulaEl = document.getElementById('geometry-formula-note');
+  const canvasHint = document.getElementById('geometry-canvas-hint');
   if (!canvas || !modeSelect || !shapeSelect || !slidersRoot || !metricsList) return;
 
   const runtimeConfig = await loadRuntimeConfig();
@@ -827,6 +961,9 @@ async function initGeometryExplorer() {
   let sliders = [];
   let snapshotTimer = null;
   let state = normalizeInitialState(runtimeConfig);
+  const view3d = { ...VIEW3D_DEFAULT };
+  let viewDragActive = false;
+  let viewDragLast = null;
 
   function getShapeDef() {
     return getShapeDefForState(state);
@@ -943,6 +1080,19 @@ async function initGeometryExplorer() {
     return getSliderRangesForUnits(state.units);
   }
 
+  function isPrismRotatable() {
+    return state.mode === '3d' && getCurrentShapeKey(state) === 'prism';
+  }
+
+  function updateCanvasInteraction() {
+    const rotatable = isPrismRotatable();
+    canvas.classList.toggle('geometry-canvas--rotatable', rotatable);
+    canvas.style.touchAction = rotatable ? 'none' : '';
+    if (canvasHint) {
+      canvasHint.hidden = !rotatable;
+    }
+  }
+
   function syncMetrics({ publish = true, immediate = false } = {}) {
     const def = getShapeDef();
     const rangesByKey = getSliderRanges();
@@ -989,10 +1139,12 @@ async function initGeometryExplorer() {
     canvas.height = Math.floor(cssH * dpr);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
+    updateCanvasInteraction();
+
     if (state.mode === '2d') {
       draw2D(ctx, canvas, state.shape2d, state.values, rangesByKey, state.units);
     } else {
-      draw3D(ctx, canvas, state.shape3d, state.values, rangesByKey, state.units);
+      draw3D(ctx, canvas, state.shape3d, state.values, rangesByKey, state.units, view3d);
     }
 
     if (publish) {
@@ -1095,6 +1247,39 @@ async function initGeometryExplorer() {
       syncMetrics();
     });
   }
+
+  canvas.addEventListener('pointerdown', (event) => {
+    if (!isPrismRotatable()) return;
+    viewDragActive = true;
+    viewDragLast = { x: event.clientX, y: event.clientY };
+    canvas.setPointerCapture(event.pointerId);
+    canvas.classList.add('geometry-canvas--dragging');
+  });
+
+  canvas.addEventListener('pointermove', (event) => {
+    if (!viewDragActive || !viewDragLast) return;
+    const dx = event.clientX - viewDragLast.x;
+    const dy = event.clientY - viewDragLast.y;
+    view3d.yaw += dx * VIEW3D_DRAG_SENSITIVITY;
+    view3d.pitch += dy * VIEW3D_DRAG_SENSITIVITY;
+    view3d.yaw = Math.min(VIEW3D_LIMITS.yawMax, Math.max(VIEW3D_LIMITS.yawMin, view3d.yaw));
+    view3d.pitch = Math.min(VIEW3D_LIMITS.pitchMax, Math.max(VIEW3D_LIMITS.pitchMin, view3d.pitch));
+    viewDragLast = { x: event.clientX, y: event.clientY };
+    syncMetrics({ publish: false });
+  });
+
+  function endViewDrag(event) {
+    if (!viewDragActive) return;
+    viewDragActive = false;
+    viewDragLast = null;
+    canvas.classList.remove('geometry-canvas--dragging');
+    if (canvas.hasPointerCapture(event.pointerId)) {
+      canvas.releasePointerCapture(event.pointerId);
+    }
+  }
+
+  canvas.addEventListener('pointerup', endViewDrag);
+  canvas.addEventListener('pointercancel', endViewDrag);
 
   const frameEl = canvas.parentElement;
   const ro = new ResizeObserver(() => {
