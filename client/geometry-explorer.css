@@ -334,6 +334,18 @@
   cursor: grabbing;
 }
 
+/* The design-system modal header sets a fixed border-box height plus large
+   vertical padding, which collapses its content box and (with flex-end)
+   pins the title to the top — misaligned with the close button. Center both. */
+.bespoke .modal-overlay .modal-header {
+  align-items: center;
+}
+
+.bespoke .modal-overlay .modal-close-button {
+  top: 50%;
+  transform: translateY(-50%);
+}
+
 @media (max-width: 768px) {
   .bespoke {
     height: auto;
