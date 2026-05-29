@@ -8,14 +8,6 @@
   overflow-x: hidden;
   display: flex;
   flex-direction: column;
-  --geometry-grid-stroke: color-mix(in srgb, var(--Colors-Stroke-Stronger) 72%, var(--Colors-Primary-Default));
-  --geometry-shape-fill: #dbeafe;
-  --geometry-prism-face-fill-top: #e0f2fe;
-  --geometry-prism-face-fill-front: #bfdbfe;
-  --geometry-prism-face-fill-right: #bfdbfe;
-  --geometry-prism-face-fill-back: #93c5fd;
-  --geometry-prism-face-fill-left: #93c5fd;
-  --geometry-prism-face-fill-bottom: #93c5fd;
 }
 
 .bespoke > main.main-layout.geometry-main {
@@ -125,7 +117,7 @@
 /* Typography from .label-large; only layout + color are app-specific. */
 .bespoke .geometry-field-label {
   display: block;
-  margin: 0 0 2px 0;
+  margin: 0 0 var(--UI-Spacing-spacing-min) 0;
   color: var(--Colors-Text-Body-Stronger);
 }
 
@@ -320,9 +312,9 @@
   margin: 0;
   padding: var(--UI-Spacing-spacing-xs) var(--UI-Spacing-spacing-ms);
   border-radius: var(--UI-Radius-radius-s);
-  background: rgba(255, 255, 255, 0.88);
+  background: var(--Colors-Backgrounds-Main-Top);
   color: var(--Colors-Text-Body-Medium);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 1px 2px var(--Colors-Shadow-Soft);
   pointer-events: none;
   user-select: none;
 }
@@ -331,7 +323,7 @@
   display: block;
   border-radius: var(--UI-Radius-radius-m);
   background: var(--Colors-Backgrounds-Main-Default);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 1px 3px var(--Colors-Shadow-Card);
 }
 
 .bespoke #geometry-canvas.geometry-canvas--rotatable {
@@ -340,31 +332,6 @@
 
 .bespoke #geometry-canvas.geometry-canvas--dragging {
   cursor: grabbing;
-}
-
-.bespoke .modal-overlay .modal-content {
-  align-items: stretch;
-}
-
-.bespoke .modal-overlay .modal-content .toc {
-  margin-bottom: var(--UI-Spacing-spacing-xl);
-}
-
-.bespoke .modal-overlay .modal-content section {
-  margin-bottom: var(--UI-Spacing-spacing-xl);
-}
-
-.bespoke .modal-overlay .modal-content section h2 {
-  margin-bottom: var(--UI-Spacing-spacing-ml);
-}
-
-.bespoke .modal-overlay .modal-content section p,
-.bespoke .modal-overlay .modal-content section li {
-  line-height: 1.65;
-}
-
-.bespoke .modal-overlay .modal-content section p + p {
-  margin-top: var(--UI-Spacing-spacing-ms);
 }
 
 @media (max-width: 768px) {

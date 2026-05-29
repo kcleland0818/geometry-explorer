@@ -476,12 +476,10 @@ async function loadRuntimeConfig() {
 }
 
 function getGeometryGridStrokeStyle() {
-  const rootStyle = getComputedStyle(document.documentElement);
-  const custom = rootStyle.getPropertyValue('--geometry-grid-stroke').trim();
-  if (custom) return custom;
-  const strong = rootStyle.getPropertyValue('--Colors-Stroke-Stronger').trim();
-  if (strong) return strong;
-  return 'hsla(218, 28%, 34%, 0.82)';
+  const strong = getComputedStyle(document.documentElement)
+    .getPropertyValue('--Colors-Stroke-Stronger')
+    .trim();
+  return strong || 'hsla(218, 28%, 34%, 0.82)';
 }
 
 function applyGeometryGridStroke(ctx) {
@@ -490,7 +488,9 @@ function applyGeometryGridStroke(ctx) {
 }
 
 function getGeometryShapeFillStyle() {
-  const fill = getComputedStyle(document.documentElement).getPropertyValue('--geometry-shape-fill').trim();
+  const fill = getComputedStyle(document.documentElement)
+    .getPropertyValue('--Colors-Primary-Lightest')
+    .trim();
   return fill || '#dbeafe';
 }
 
@@ -505,24 +505,6 @@ function canvasFont(sizeVar, weight = 600) {
   const family = rootStyle.getPropertyValue('--body-family').trim() || 'Work Sans';
   const size = rootStyle.getPropertyValue(sizeVar).trim() || '14px';
   return `${weight} ${size} ${family}, sans-serif`;
-}
-
-const PRISM_FACE_FILL_VARS = {
-  kMin: '--geometry-prism-face-fill-bottom',
-  kMax: '--geometry-prism-face-fill-top',
-  jMin: '--geometry-prism-face-fill-front',
-  jMax: '--geometry-prism-face-fill-back',
-  iMax: '--geometry-prism-face-fill-right',
-  iMin: '--geometry-prism-face-fill-left',
-};
-
-function getPrismFaceFillStyle(gridKey) {
-  const varName = PRISM_FACE_FILL_VARS[gridKey];
-  if (varName) {
-    const fill = getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
-    if (fill) return fill;
-  }
-  return getGeometryShapeFillStyle();
 }
 
 function prism3DPoint(L, W, H, i, j, k) {
@@ -665,10 +647,11 @@ function drawPrism(ctx, canvas, values, units, view3d) {
 
   const visibleByFaceIndex = faces.map((face) => face.visible);
   const sortedFaces = [...faces].sort((a, b) => a.avgDepth - b.avgDepth);
+  const faceFill = getGeometryShapeFillStyle();
 
   sortedFaces.forEach((face) => {
     if (!face.visible) return;
-    ctx.fillStyle = getPrismFaceFillStyle(face.grid);
+    ctx.fillStyle = faceFill;
     ctx.beginPath();
     ctx.moveTo(face.points[0].x, face.points[0].y);
     for (let i = 1; i < face.points.length; i += 1) ctx.lineTo(face.points[i].x, face.points[i].y);
