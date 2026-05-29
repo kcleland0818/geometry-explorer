@@ -193,7 +193,7 @@
 }
 
 .bespoke .geometry-metric-primary {
-  color: var(--Colors-Primary-Default);
+  color: var(--Colors-Text-Body-Strong);
 }
 
 /* Typography from .label-number-xsmall; only color is app-specific. */
