@@ -107,28 +107,25 @@
   display: none;
 }
 
+/* Font size/weight/family come from the design-system .heading-xxxsmall class;
+   only spacing + color are app-specific here. */
 .bespoke .geometry-card-title {
   margin: 0 0 var(--UI-Spacing-spacing-xs) 0;
   padding-bottom: 0;
   border-bottom: none;
-  font-size: 0.9375rem;
-  font-weight: 700;
-  line-height: 1.25;
   color: var(--Colors-Text-Body-Strongest);
 }
 
+/* Font size from .body-xxsmall; spacing + color are app-specific. */
 .bespoke .geometry-panel-lede {
   margin: 0 0 var(--UI-Spacing-spacing-s) 0;
-  line-height: 1.45;
   color: var(--Colors-Text-Body-Subtle);
-  font-size: 0.8125rem;
 }
 
-.bespoke label.geometry-field-label {
+/* Font size from .body-xxsmall; weight + color are app-specific. */
+.bespoke .geometry-field-label {
   display: block;
   margin: 0 0 2px 0;
-  font-size: 0.8125rem;
-  line-height: 1.35;
   color: var(--Colors-Text-Body-Stronger);
   font-weight: 600;
 }
@@ -145,24 +142,17 @@
   margin-bottom: 0;
 }
 
+/* Font size from .body-xsmall; weight + color are app-specific. */
 .bespoke .geometry-control-label {
   display: block;
-  font-size: 0.875rem;
   font-weight: 600;
   color: var(--Colors-Text-Body-Stronger);
   margin-bottom: var(--UI-Spacing-spacing-xxs);
-  line-height: 1.4;
 }
 
-.bespoke .geometry-select {
-  width: 100%;
-  padding: var(--UI-Spacing-spacing-xs) var(--UI-Spacing-spacing-s);
-  border-radius: var(--UI-Radius-radius-s);
-  border: 1px solid var(--Colors-Stroke-Default);
-  background: var(--Colors-Backgrounds-Main-Default);
-  color: var(--Colors-Text-Body-Default);
-  font-size: 0.8125rem;
-  line-height: 1.35;
+.bespoke .geometry-dropdown--disabled {
+  opacity: 0.5;
+  pointer-events: none;
 }
 
 .bespoke .geometry-metrics {
@@ -174,11 +164,12 @@
   gap: var(--UI-Spacing-spacing-xs);
 }
 
+/* .box provides the surface (background, radius, border); this only handles the
+   row's internal layout, overriding the box's default centered flex + large padding. */
 .bespoke .geometry-metric-row {
+  display: block;
   padding: var(--UI-Spacing-spacing-xs) var(--UI-Spacing-spacing-s);
-  border-radius: var(--UI-Radius-radius-s);
-  background: var(--Colors-Backgrounds-Main-Top);
-  border: 1px solid var(--Colors-Stroke-Default);
+  text-align: left;
 }
 
 .bespoke .geometry-metric-head {
@@ -189,10 +180,9 @@
   min-width: 0;
 }
 
+/* Font size from .body-xxsmall; weight + color are app-specific. */
 .bespoke .geometry-metric-name {
-  font-size: 0.8125rem;
   font-weight: 600;
-  line-height: 1.35;
   color: var(--Colors-Text-Body-Strongest);
   min-width: 0;
   flex-shrink: 1;

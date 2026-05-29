@@ -15,11 +15,13 @@
   <link rel="stylesheet" href="./design-system/typography/typography.css">
 
   <!-- Design System Components -->
+  <link rel="stylesheet" href="./design-system/components/button/button.css">
   <link rel="stylesheet" href="./design-system/components/boxes/boxes.css">
   <link rel="stylesheet" href="./design-system/components/input/input.css">
   <link rel="stylesheet" href="./design-system/components/dropdown/dropdown.css">
   <link rel="stylesheet" href="./design-system/components/tags/tags.css">
   <link rel="stylesheet" href="./design-system/components/numeric-slider/numeric-slider.css">
+  <link rel="stylesheet" href="./design-system/components/modal/modal.css">
 
   <!-- Template-specific components (layout, utilities, temporary components) -->
   <link rel="stylesheet" href="./bespoke-template.css" />
@@ -30,33 +32,30 @@
     <aside class="sidebar geometry-sidebar" aria-label="Shape controls">
       <section class="box card geometry-sidebar-stack">
         <div class="geometry-panel-section" id="geometry-shape-panel">
-          <h2 class="geometry-card-title" id="geometry-shape-heading">Shape</h2>
+          <h2 class="geometry-card-title heading-xxxsmall" id="geometry-shape-heading">Shape</h2>
           <div class="geometry-field geometry-field--compact" id="geometry-mode-field">
-            <label class="geometry-field-label" for="geometry-mode">Flat or solid</label>
-            <select id="geometry-mode" class="geometry-select" aria-label="Choose flat or solid figures">
-              <option value="2d">2D — perimeter &amp; area</option>
-              <option value="3d">3D — surface area &amp; volume</option>
-            </select>
+            <span class="geometry-field-label body-xxsmall" id="geometry-mode-label">Flat or solid</span>
+            <div id="geometry-mode"></div>
           </div>
           <div class="geometry-field geometry-field--compact" id="geometry-shape-field">
-            <label class="geometry-field-label" for="geometry-shape">Figure</label>
-            <select id="geometry-shape" class="geometry-select" aria-label="Choose figure"></select>
+            <span class="geometry-field-label body-xxsmall" id="geometry-shape-label">Figure</span>
+            <div id="geometry-shape"></div>
           </div>
           <div class="geometry-field geometry-field--compact">
-            <label class="geometry-field-label" for="geometry-units">Units</label>
-            <select id="geometry-units" class="geometry-select" aria-label="Choose measurement units"></select>
+            <span class="geometry-field-label body-xxsmall" id="geometry-units-label">Units</span>
+            <div id="geometry-units"></div>
           </div>
         </div>
 
         <div class="geometry-panel-section">
-          <h2 class="geometry-card-title">Measurements</h2>
+          <h2 class="geometry-card-title heading-xxxsmall">Measurements</h2>
           <ul id="geometry-metrics" class="geometry-metrics"></ul>
           <p id="geometry-formula-note" class="geometry-formula geometry-units-note" aria-live="polite"></p>
         </div>
 
         <div class="geometry-panel-section geometry-panel-section--sliders">
-          <h2 class="geometry-card-title">Dimensions</h2>
-          <p class="geometry-panel-lede body-small">Drag the tracks or type values to resize the figure.</p>
+          <h2 class="geometry-card-title heading-xxxsmall">Dimensions</h2>
+          <p class="geometry-panel-lede body-xxsmall">Drag the tracks or type values to resize the figure.</p>
           <div id="geometry-sliders"></div>
         </div>
       </section>
