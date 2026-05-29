@@ -2,6 +2,7 @@
  * Geometry Explorer — interactive perimeter, area, surface area, and volume.
  */
 import NumericSlider from './design-system/components/numeric-slider/numeric-slider.js';
+import Dropdown from './design-system/components/dropdown/dropdown.js';
 
 const DEFAULT_MODE = '2d';
 const DEFAULT_SHAPE_2D = 'rectangle';
@@ -475,12 +476,10 @@ async function loadRuntimeConfig() {
 }
 
 function getGeometryGridStrokeStyle() {
-  const rootStyle = getComputedStyle(document.documentElement);
-  const custom = rootStyle.getPropertyValue('--geometry-grid-stroke').trim();
-  if (custom) return custom;
-  const strong = rootStyle.getPropertyValue('--Colors-Stroke-Stronger').trim();
-  if (strong) return strong;
-  return 'hsla(218, 28%, 34%, 0.82)';
+  const strong = getComputedStyle(document.documentElement)
+    .getPropertyValue('--Colors-Stroke-Stronger')
+    .trim();
+  return strong || 'hsla(218, 28%, 34%, 0.82)';
 }
 
 function applyGeometryGridStroke(ctx) {
@@ -489,26 +488,23 @@ function applyGeometryGridStroke(ctx) {
 }
 
 function getGeometryShapeFillStyle() {
-  const fill = getComputedStyle(document.documentElement).getPropertyValue('--geometry-shape-fill').trim();
+  const fill = getComputedStyle(document.documentElement)
+    .getPropertyValue('--Colors-Primary-Lightest')
+    .trim();
   return fill || '#dbeafe';
 }
 
-const PRISM_FACE_FILL_VARS = {
-  kMin: '--geometry-prism-face-fill-bottom',
-  kMax: '--geometry-prism-face-fill-top',
-  jMin: '--geometry-prism-face-fill-front',
-  jMax: '--geometry-prism-face-fill-back',
-  iMax: '--geometry-prism-face-fill-right',
-  iMin: '--geometry-prism-face-fill-left',
-};
-
-function getPrismFaceFillStyle(gridKey) {
-  const varName = PRISM_FACE_FILL_VARS[gridKey];
-  if (varName) {
-    const fill = getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
-    if (fill) return fill;
-  }
-  return getGeometryShapeFillStyle();
+/**
+ * Build a canvas `ctx.font` string from design-system typography tokens so that
+ * text painted on the canvas stays in sync with typography.css. Canvas cannot
+ * use the CSS typography classes directly (it paints pixels, not DOM), so we
+ * read the same custom properties the classes are built from.
+ */
+function canvasFont(sizeVar, weight = 600) {
+  const rootStyle = getComputedStyle(document.documentElement);
+  const family = rootStyle.getPropertyValue('--body-family').trim() || 'Work Sans';
+  const size = rootStyle.getPropertyValue(sizeVar).trim() || '14px';
+  return `${weight} ${size} ${family}, sans-serif`;
 }
 
 function prism3DPoint(L, W, H, i, j, k) {
@@ -651,10 +647,11 @@ function drawPrism(ctx, canvas, values, units, view3d) {
 
   const visibleByFaceIndex = faces.map((face) => face.visible);
   const sortedFaces = [...faces].sort((a, b) => a.avgDepth - b.avgDepth);
+  const faceFill = getGeometryShapeFillStyle();
 
   sortedFaces.forEach((face) => {
     if (!face.visible) return;
-    ctx.fillStyle = getPrismFaceFillStyle(face.grid);
+    ctx.fillStyle = faceFill;
     ctx.beginPath();
     ctx.moveTo(face.points[0].x, face.points[0].y);
     for (let i = 1; i < face.points.length; i += 1) ctx.lineTo(face.points[i].x, face.points[i].y);
@@ -691,7 +688,7 @@ function drawPrism(ctx, canvas, values, units, view3d) {
   const labelColor =
     getComputedStyle(document.documentElement).getPropertyValue('--Colors-Text-Body-Default') || '#334155';
   ctx.fillStyle = labelColor.trim() || '#334155';
-  ctx.font = '600 12px Work Sans, sans-serif';
+  ctx.font = canvasFont('--Fonts-Special-sm');
 
   const labelDefs = [
     { text: `ℓ=${formatDimensionLabel(L, units)}`, from: [0, 0, 0], to: [L, 0, 0], dx: 0, dy: 12, align: 'center', baseline: 'top' },
@@ -772,7 +769,7 @@ function draw2D(ctx, canvas, shapeKey, values, rangesByKey = {}, units = DEFAULT
     }
 
     ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--Colors-Text-Body-Default') || '#334155';
-    ctx.font = '600 14px Work Sans, sans-serif';
+    ctx.font = canvasFont('--Fonts-Body-Default-xs');
     ctx.fillText(`w = ${formatDimensionLabel(rw, units)}`, x0 + bw / 2 - 18, y0 - 10);
     ctx.fillText(`h = ${formatDimensionLabel(rh, units)}`, x0 + bw + 8, y0 + bh / 2);
   } else if (shapeKey === 'circle') {
@@ -789,7 +786,7 @@ function draw2D(ctx, canvas, shapeKey, values, rangesByKey = {}, units = DEFAULT
     ctx.lineTo(cx + rad, cy);
     ctx.stroke();
     ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--Colors-Text-Body-Default') || '#334155';
-    ctx.font = '600 13px Work Sans, sans-serif';
+    ctx.font = canvasFont('--Fonts-Body-Default-xxs');
     ctx.fillText(`r = ${formatDimensionLabel(r, units)}`, cx + rad * 0.38, cy - rad * 0.42);
   } else if (shapeKey === 'rightTriangle') {
     const a = values.legA;
@@ -839,7 +836,7 @@ function draw2D(ctx, canvas, shapeKey, values, rangesByKey = {}, units = DEFAULT
     ctx.restore();
 
     ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--Colors-Text-Body-Default') || '#334155';
-    ctx.font = '600 14px Work Sans, sans-serif';
+    ctx.font = canvasFont('--Fonts-Body-Default-xs');
     ctx.fillText(`a = ${formatDimensionLabel(a, units)}`, x0 + bx / 2 - 10, y0 + 18);
     ctx.fillText(`b = ${formatDimensionLabel(b, units)}`, x0 - 28, y0 - ay / 2);
   }
@@ -895,7 +892,7 @@ function draw3D(ctx, canvas, shapeKey, values, rangesByKey = {}, units = DEFAULT
     ctx.fill();
 
     ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--Colors-Text-Body-Default') || '#334155';
-    ctx.font = '12px Work Sans, sans-serif';
+    ctx.font = canvasFont('--Fonts-Special-sm', 400);
     ctx.fillText(`r=${formatDimensionLabel(r, units)}`, cx + rw / 2 + 6, cy);
     ctx.fillText(`h=${formatDimensionLabel(ht, units)}`, cx - rw / 2 - 28, cy);
   } else if (shapeKey === 'sphere') {
@@ -940,25 +937,28 @@ function draw3D(ctx, canvas, shapeKey, values, rangesByKey = {}, units = DEFAULT
     ctx.stroke();
 
     ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--Colors-Text-Body-Default') || '#334155';
-    ctx.font = '600 12px Work Sans, sans-serif';
+    ctx.font = canvasFont('--Fonts-Special-sm');
     ctx.fillText(`r=${formatDimensionLabel(r, units)}`, cx + rad * 0.32, cy + rad * 0.52);
   }
 }
 
 async function initGeometryExplorer() {
   const canvas = document.getElementById('geometry-canvas');
-  const modeSelect = document.getElementById('geometry-mode');
-  const shapeSelect = document.getElementById('geometry-shape');
-  const unitsSelect = document.getElementById('geometry-units');
+  const modeMount = document.getElementById('geometry-mode');
+  const shapeMount = document.getElementById('geometry-shape');
+  const unitsMount = document.getElementById('geometry-units');
   const slidersRoot = document.getElementById('geometry-sliders');
   const metricsList = document.getElementById('geometry-metrics');
   const formulaEl = document.getElementById('geometry-formula-note');
   const canvasHint = document.getElementById('geometry-canvas-hint');
-  if (!canvas || !modeSelect || !shapeSelect || !slidersRoot || !metricsList) return;
+  if (!canvas || !modeMount || !shapeMount || !slidersRoot || !metricsList) return;
 
   const runtimeConfig = await loadRuntimeConfig();
   const ctx = canvas.getContext('2d');
   let sliders = [];
+  let modeDropdown = null;
+  let shapeDropdown = null;
+  let unitsDropdown = null;
   let snapshotTimer = null;
   let state = normalizeInitialState(runtimeConfig);
   const view3d = { ...VIEW3D_DEFAULT };
@@ -1014,6 +1014,12 @@ async function initGeometryExplorer() {
     }, SNAPSHOT_DEBOUNCE_MS);
   }
 
+  function setDropdownDisabled(dropdown, disabled) {
+    if (!dropdown || !dropdown.toggle) return;
+    dropdown.toggle.disabled = disabled;
+    dropdown.container.classList.toggle('geometry-dropdown--disabled', disabled);
+  }
+
   function applyUiConfig() {
     const ui = runtimeConfig.ui || {};
     const modeField = document.getElementById('geometry-mode-field');
@@ -1025,35 +1031,40 @@ async function initGeometryExplorer() {
     if (modeField) {
       modeField.hidden = lockedMode;
     }
-    modeSelect.disabled = lockedMode;
+    setDropdownDisabled(modeDropdown, lockedMode);
 
     if (shapeField) {
       shapeField.hidden = lockedShape;
     }
-    shapeSelect.disabled = lockedShape;
+    setDropdownDisabled(shapeDropdown, lockedShape);
 
     if (shapeHeading) {
       shapeHeading.hidden = lockedMode && lockedShape;
     }
 
-    if (unitsSelect) {
-      unitsSelect.disabled = ui.lockedUnits === true;
-    }
+    setDropdownDisabled(unitsDropdown, ui.lockedUnits === true);
+
     if (formulaEl) {
       formulaEl.hidden = ui.showFormulaHints === false;
     }
   }
 
-  function populateUnitsOptions() {
-    if (!unitsSelect) return;
-    unitsSelect.innerHTML = '';
-    Object.entries(UNIT_SYSTEMS).forEach(([key, system]) => {
-      const opt = document.createElement('option');
-      opt.value = key;
-      opt.textContent = system.label;
-      unitsSelect.appendChild(opt);
+  function buildUnitsDropdown() {
+    if (!unitsMount) return;
+    if (unitsDropdown) unitsDropdown.destroy();
+    unitsDropdown = new Dropdown(unitsMount, {
+      items: Object.entries(UNIT_SYSTEMS).map(([key, system]) => ({
+        value: key,
+        label: system.label,
+      })),
+      selectedValue: state.units,
+      onSelect: (value) => {
+        convertStateValuesToUnits(normalizeUnits(value));
+        rebuildSliders();
+        syncMetrics();
+      },
     });
-    unitsSelect.value = state.units;
+    unitsDropdown.toggle.setAttribute('aria-label', 'Choose measurement units');
   }
 
   function convertStateValuesToUnits(nextUnits) {
@@ -1102,15 +1113,15 @@ async function initGeometryExplorer() {
     const showHints = runtimeConfig.ui?.showFormulaHints !== false;
     metricsList.innerHTML = rows
       .map(
-        (row) => `<li class="geometry-metric-row">
+        (row) => `<li class="box emphasized non-interactive geometry-metric-row">
         <div class="geometry-metric-head">
-          <span class="geometry-metric-name">${row.name}</span>
+          <span class="geometry-metric-name label-medium">${row.name}</span>
           <span class="geometry-metric-value">
-            <span class="geometry-metric-primary">${row.primary}</span>
-            ${row.alternate ? `<span class="geometry-metric-alt">${row.alternate}</span>` : ''}
+            <span class="geometry-metric-primary label-number-medium">${row.primary}</span>
+            ${row.alternate ? `<span class="geometry-metric-alt label-number-xsmall">${row.alternate}</span>` : ''}
           </span>
         </div>
-        ${showHints ? `<p class="geometry-metric-hint">${row.hint}</p>` : ''}
+        ${showHints ? `<p class="geometry-metric-hint body-xxsmall">${row.hint}</p>` : ''}
       </li>`,
       )
       .join('');
@@ -1172,7 +1183,7 @@ async function initGeometryExplorer() {
       const wrap = document.createElement('div');
       wrap.className = 'geometry-slider-block';
       const lab = document.createElement('span');
-      lab.className = 'geometry-control-label';
+      lab.className = 'geometry-control-label label-large';
       lab.textContent = paramLabelWithUnits(def.paramLabels[index], state.units);
       const mount = document.createElement('div');
       mount.id = `geom-slider-${key}`;
@@ -1197,7 +1208,26 @@ async function initGeometryExplorer() {
     });
   }
 
-  function populateShapeOptions() {
+  function buildModeDropdown() {
+    if (modeDropdown) modeDropdown.destroy();
+    modeDropdown = new Dropdown(modeMount, {
+      items: [
+        { value: '2d', label: '2D — perimeter & area' },
+        { value: '3d', label: '3D — surface area & volume' },
+      ],
+      selectedValue: state.mode,
+      onSelect: (value) => {
+        state.mode = value;
+        buildShapeDropdown();
+        applyModeShapeDefaults();
+        rebuildSliders();
+        syncMetrics();
+      },
+    });
+    modeDropdown.toggle.setAttribute('aria-label', 'Choose flat or solid figures');
+  }
+
+  function buildShapeDropdown() {
     const catalog = getCatalog(state.mode);
     let currentKey = getCurrentShapeKey(state);
     const keys = Object.keys(catalog);
@@ -1206,46 +1236,27 @@ async function initGeometryExplorer() {
       if (state.mode === '2d') state.shape2d = currentKey;
       else state.shape3d = currentKey;
     }
-    shapeSelect.innerHTML = '';
-    keys.forEach((key) => {
-      const opt = document.createElement('option');
-      opt.value = key;
-      opt.textContent = catalog[key].label;
-      shapeSelect.appendChild(opt);
+    if (shapeDropdown) shapeDropdown.destroy();
+    shapeDropdown = new Dropdown(shapeMount, {
+      items: keys.map((key) => ({ value: key, label: catalog[key].label })),
+      selectedValue: currentKey,
+      onSelect: (value) => {
+        if (state.mode === '2d') {
+          state.shape2d = value;
+        } else {
+          state.shape3d = value;
+        }
+        applyModeShapeDefaults();
+        rebuildSliders();
+        syncMetrics();
+      },
     });
-    shapeSelect.value = currentKey;
+    shapeDropdown.toggle.setAttribute('aria-label', 'Choose figure');
   }
 
   function applyModeShapeDefaults() {
     const def = getShapeDef();
     state.values = normalizeValues(def, def.defaults, getSliderRanges());
-  }
-
-  modeSelect.addEventListener('change', () => {
-    state.mode = modeSelect.value;
-    populateShapeOptions();
-    applyModeShapeDefaults();
-    rebuildSliders();
-    syncMetrics();
-  });
-
-  shapeSelect.addEventListener('change', () => {
-    if (state.mode === '2d') {
-      state.shape2d = shapeSelect.value;
-    } else {
-      state.shape3d = shapeSelect.value;
-    }
-    applyModeShapeDefaults();
-    rebuildSliders();
-    syncMetrics();
-  });
-
-  if (unitsSelect) {
-    unitsSelect.addEventListener('change', () => {
-      convertStateValuesToUnits(normalizeUnits(unitsSelect.value));
-      rebuildSliders();
-      syncMetrics();
-    });
   }
 
   canvas.addEventListener('pointerdown', (event) => {
@@ -1289,12 +1300,30 @@ async function initGeometryExplorer() {
     ro.observe(frameEl);
   }
 
+  // Canvas text is painted with the design-system body font; preload it so the
+  // first render doesn't paint labels in a fallback font.
+  if (document.fonts?.load) {
+    try {
+      await Promise.all([
+        document.fonts.load('600 14px "Work Sans"'),
+        document.fonts.load('400 12px "Work Sans"'),
+      ]);
+    } catch (error) {
+      console.warn('Geometry Explorer: Work Sans preload failed; using fallback.', error);
+    }
+  }
+
+  buildModeDropdown();
+  buildUnitsDropdown();
+  buildShapeDropdown();
   applyUiConfig();
-  modeSelect.value = state.mode;
-  populateUnitsOptions();
-  populateShapeOptions();
   rebuildSliders();
   syncMetrics({ immediate: true });
+
+  // Repaint once any remaining web fonts settle (covers slow/async font loads).
+  if (document.fonts?.ready) {
+    document.fonts.ready.then(() => syncMetrics({ publish: false }));
+  }
 }
 
 export { initGeometryExplorer };
